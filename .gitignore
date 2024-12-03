@@ -1,0 +1,12 @@
+# Ignore everything
+*
+
+# Except the following files and directories
+!.gitignore
+!README.md
+!requirements.txt
+!characters.json
+!app.py
+!database/
+!static/
+!templates/

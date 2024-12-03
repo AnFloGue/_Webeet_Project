@@ -1,3 +1,5 @@
+import random
+
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import json
@@ -32,6 +34,20 @@ class CharacterModel(db.Model):
     age = db.Column(db.Integer)
     death = db.Column(db.Integer)
     strength = db.Column(db.String(100))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "house": self.house,
+            "animal": self.animal,
+            "symbol": self.symbol,
+            "nickname": self.nickname,
+            "role": self.role,
+            "age": self.age,
+            "death": self.death,
+            "strength": self.strength
+        }
 
 
 @app.before_request
@@ -71,27 +87,35 @@ def setup_database():
 # Get all characters and paginate them
 @app.route("/characters", methods=["GET"])
 def get_characters():
-    # pagination
-    limit = request.args.get("limit", 1, type=int)
-    skip = request.args.get("skip", 4, type=int)
-    characters_paginated_query = CharacterModel.query.offset(skip).limit(limit).all()
+    limit = request.args.get("limit", type=int)
+    skip = request.args.get("skip", type=int)
+    sort_by = request.args.get("sort_by", type=str)
+    order = request.args.get("order", "asc", type=str)
+    filters = {key: value for key, value in request.args.items() if key not in ["limit", "skip", "sort_by", "order"]}
 
-    characters_paginated_list = []
+    query = CharacterModel.query
 
-    for characters in characters_paginated_query:
-        character_dict = {
-            "id": characters.id,
-            "name": characters.name,
-            "house": characters.house,
-            "animal": characters.animal,
-            "symbol": characters.symbol,
-            "nickname": characters.nickname,
-            "role": characters.role,
-            "age": characters.age,
-            "death": characters.death,
-            "strength": characters.strength
-        }
-        characters_paginated_list.append(character_dict)
+    for attr, value in filters.items():
+        if attr == "age_more_than":
+            query = query.filter(CharacterModel.age >= int(value))
+        elif attr == "age_less_than":
+            query = query.filter(CharacterModel.age <= int(value))
+        else:
+            query = query.filter(getattr(CharacterModel, attr).ilike(f"%{value}%"))
+
+    if sort_by:
+        if order == "asc":
+            query = query.order_by(getattr(CharacterModel, sort_by).asc())
+        else:
+            query = query.order_by(getattr(CharacterModel, sort_by).desc())
+
+    if limit is None and skip is None:
+        characters = query.all()
+        random_characters = random.sample(characters, min(20, len(characters)))
+        characters_paginated_list = [character.to_dict() for character in random_characters]
+    else:
+        characters_paginated_query = query.offset(skip).limit(limit).all()
+        characters_paginated_list = [character.to_dict() for character in characters_paginated_query]
 
     return jsonify(characters_paginated_list), 200
 
@@ -126,10 +150,10 @@ def add_character():
     data = request.json
     required_fields = ["id", "name", "house", "animal", "symbol", "nickname", "role", "age", "death", "strength"]
 
-    # Check if all required fields are inputted
+    # Check if all required fields are inputted and valid
     for field in required_fields:
-        if field not in data:
-            return jsonify({"error": f" Attention!!! - Missing required field: {field}"}), 400
+        if field not in data or not isinstance(data[field], (str, int)):
+            return jsonify({"error": f"Attention!!! - Missing or invalid required field: {field}"}), 400
 
     # Clear the session to avoid stale data
     db.session.expire_all()
@@ -157,7 +181,6 @@ def add_character():
     db.session.commit()
 
     return jsonify({"message": "Character added"}), 201
-
 # Edit a character by ID
 @app.route("/characters/<int:id>", methods=["PATCH"])
 def edit_character(id):
@@ -193,6 +216,21 @@ def edit_character(id):
 
     db.session.commit()
     return jsonify({"message": "Character updated"}), 200
+
+
+@app.errorhandler(400)
+def bad_request(error):
+    return jsonify({"error": "Bad Request"}), 400
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"error": "Not Found"}), 404
+
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    return jsonify({"error": "Internal Server Error"}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True)

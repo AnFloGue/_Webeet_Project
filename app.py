@@ -42,11 +42,11 @@ def setup_database():
         try:
             with open("characters.json", "r") as file:
                 characters_data = json.load(file)
-                
+
                 for character_obj in characters_data:
                     # we go through the characters in the json file and grab the data
                     # then instantiating an object of the CharacterModel class for each character
-                    
+
                     character_obj = CharacterModel(
                         id=character_obj["id"],
                         name=character_obj["name"],
@@ -61,9 +61,9 @@ def setup_database():
                     )
                     # we add the character object to the database session
                     db.session.add(character_obj)
-                
+
                 db.session.commit()
-        
+
         except FileNotFoundError:
             print("Attention!!! - characters.json - does not exist")
 
@@ -75,9 +75,9 @@ def get_characters():
     limit = request.args.get("limit", 1, type=int)
     skip = request.args.get("skip", 4, type=int)
     characters_paginated_query = CharacterModel.query.offset(skip).limit(limit).all()
-    
+
     characters_paginated_list = []
-    
+
     for characters in characters_paginated_query:
         character_dict = {
             "id": characters.id,
@@ -92,7 +92,7 @@ def get_characters():
             "strength": characters.strength
         }
         characters_paginated_list.append(character_dict)
-    
+
     return jsonify(characters_paginated_list), 200
 
 
@@ -100,10 +100,10 @@ def get_characters():
 @app.route("/characters/<int:id>", methods=["GET"])
 def get_character_by_id(id):
     character_by_id = CharacterModel.query.get(id)
-    
+
     if not character_by_id:
         return jsonify({"error": "Attention!!! - Character does not exist"}), 404
-    
+
     # if character exist, we create a dictionary with the character data
     character_data = {
         "id": character_by_id.id,
@@ -117,28 +117,28 @@ def get_character_by_id(id):
         "death": character_by_id.death,
         "strength": character_by_id.strength
     }
-    
+
     return jsonify(character_data), 200
 
-
+# Add a new character
 @app.route("/characters", methods=["POST"])
 def add_character():
     data = request.json
     required_fields = ["id", "name", "house", "animal", "symbol", "nickname", "role", "age", "death", "strength"]
-    
+
     # Check if all required fields are inputted
     for field in required_fields:
         if field not in data:
-            return jsonify({"error": f"Missing required field: {field}"}), 400
-    
+            return jsonify({"error": f" Attention!!! - Missing required field: {field}"}), 400
+
     # Clear the session to avoid stale data
     db.session.expire_all()
-    
+
     # Check if the character with the same id already exists
     existing_character = CharacterModel.query.get(data["id"])
     if existing_character:
-        return jsonify({"error": "Character with this ID already exists"}), 400
-    
+        return jsonify({"error": "Attention!!! - Character with this ID already exists"}), 400
+
     # Create a new CharacterModel database using the dictionary
     new_character = CharacterModel(
         id=data["id"],
@@ -152,12 +152,47 @@ def add_character():
         death=data["death"],
         strength=data["strength"]
     )
-    
+
     db.session.add(new_character)
     db.session.commit()
-    
+
     return jsonify({"message": "Character added"}), 201
 
+# Edit a character by ID
+@app.route("/characters/<int:id>", methods=["PATCH"])
+def edit_character(id):
+    
+    # we get an instance of the CharacterModel class with the id
+    characters_id = CharacterModel.query.get(id)
+    
+    # check if the character exists
+    if not characters_id:
+        return jsonify({"error": "Attention!!! - Character not found"}), 404
+
+    # if the field is in the request, we update the field that is in the request by using
+    # the CharacterModel object method
+    characters_updates = request.json
+    if "name" in characters_updates:
+        characters_id.name = characters_updates["name"]
+    if "house" in characters_updates:
+        characters_id.house = characters_updates["house"]
+    if "animal" in characters_updates:
+        characters_id.animal = characters_updates["animal"]
+    if "symbol" in characters_updates:
+        characters_id.symbol = characters_updates["symbol"]
+    if "nickname" in characters_updates:
+        characters_id.nickname = characters_updates["nickname"]
+    if "role" in characters_updates:
+        characters_id.role = characters_updates["role"]
+    if "age" in characters_updates:
+        characters_id.age = characters_updates["age"]
+    if "death" in characters_updates:
+        characters_id.death = characters_updates["death"]
+    if "strength" in characters_updates:
+        characters_id.strength = characters_updates["strength"]
+
+    db.session.commit()
+    return jsonify({"message": "Character updated"}), 200
 
 if __name__ == "__main__":
     app.run(debug=True)

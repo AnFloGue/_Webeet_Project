@@ -63,8 +63,15 @@ def setup_database():
 
                     for character_data in characters_data:
                         # Convert age and death to integers if they exist, else set to None
-                        age = int(character_data["age"]) if character_data.get("age") else None
-                        death = int(character_data["death"]) if character_data.get("death") else None
+                        if character_data.get("age"):
+                            age = int(character_data["age"])
+                        else:
+                            age = None
+                        
+                        if character_data.get("death"):
+                            death = int(character_data["death"])
+                        else:
+                            death = None
 
                         # Instantiating an object of the CharacterModel class for each character
                         character_obj = CharacterModel(
@@ -84,7 +91,11 @@ def setup_database():
 
             except FileNotFoundError:
                 print("Warning: 'characters.json' does not exist")
+        
+        # we avoid reinitializing the database so that the data is not being duplicated
         app.db_initialized = True
+        
+        
 
 @app.route("/characters", methods=["GET"])
 def get_characters():
@@ -94,17 +105,19 @@ def get_characters():
     order = request.args.get("order", "asc", type=str)
 
     filters = {}
+# Get all parameters in the request that are not limit, skip, sort_by, or order and
+# add them to the filters dictionary so that we can filter the query. With this,
+# we can apply these filters to the database query and get the requested data.
     for key, value in request.args.items():
         if key not in ["limit", "skip", "sort_by", "order"]:
             filters[key] = value
-
-    valid_string_filter_fields = ['name', 'house', 'role', 'strength']
-    valid_integer_filter_fields = ['age']
-
+    
+    valid_filter_fields = ['age', 'name', 'house', 'role', 'strength']
+    
     query = CharacterModel.query
-
+    
     for key, value in filters.items():
-        if key == "age_more_than":
+        if key == "age_more_than":       # query parameter that should come from the request URL
             try:
                 query = query.filter(CharacterModel.age >= int(value))
             except ValueError:
@@ -114,13 +127,14 @@ def get_characters():
                 query = query.filter(CharacterModel.age <= int(value))
             except ValueError:
                 return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
-        elif key in valid_string_filter_fields:
-            query = query.filter(getattr(CharacterModel, key).ilike(f"%{value}%"))
-        elif key in valid_integer_filter_fields:
-            try:
-                query = query.filter(getattr(CharacterModel, key) == int(value))
-            except ValueError:
-                return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
+        elif key in valid_filter_fields:
+            if key == "age":
+                try:
+                    query = query.filter(CharacterModel.age == int(value))
+                except ValueError:
+                    return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
+            else:
+                query = query.filter(getattr(CharacterModel, key).ilike(f"%{value}%"))
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
 
@@ -131,11 +145,14 @@ def get_characters():
         else:
             query = query.order_by(getattr(CharacterModel, sort_by).desc())
 
+    # If limit is not provided, return 20 random characters
     if limit is None and skip is None:
         limit = 20
         characters_query = query.all()
         random.shuffle(characters_query)
         characters_query = characters_query[:limit]
+        
+    # If limit is not provided but skip is, return all characters after the skip
     else:
         if skip is None:
             skip = 0
@@ -144,7 +161,9 @@ def get_characters():
         else:
             characters_query = query.offset(skip).limit(limit).all()
 
-    characters_list = [character.to_dict() for character in characters_query]
+    characters_list = []
+    for character in characters_query:
+        characters_list.append(character.to_dict())
 
     return jsonify(characters_list), 200
 
@@ -166,7 +185,7 @@ def add_character():
     data = request.json
     required_fields = ["name", "role", "age", "strength"]
 
-    # Check if all required fields are entered and valid
+    # Check if all minimum required fields are entered and valid
     for field in required_fields:
         if field not in data or not data[field]:
             return jsonify({"error": f"Missing required field: {field}"}), 400

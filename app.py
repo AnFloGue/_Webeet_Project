@@ -4,7 +4,6 @@ import json
 
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func
 
 app = Flask(__name__)
 
@@ -67,7 +66,6 @@ def setup_database():
                         age = int(character_data["age"]) if character_data.get("age") else None
                         death = int(character_data["death"]) if character_data.get("death") else None
 
-                        # We go through the characters in the json file and grab the data
                         # Instantiating an object of the CharacterModel class for each character
                         character_obj = CharacterModel(
                             name=character_data["name"],
@@ -90,56 +88,62 @@ def setup_database():
 
 @app.route("/characters", methods=["GET"])
 def get_characters():
-    # Getting the query parameters from the request
-    # We will use this to filter, sort, and paginate the data
-    # Example:
-    # /characters?limit=10&skip=0&sort_by=age&order=asc&name=Jon%20Snow&age_more_than=20
     limit = request.args.get("limit", type=int)
     skip = request.args.get("skip", type=int)
     sort_by = request.args.get("sort_by", type=str)
     order = request.args.get("order", "asc", type=str)
 
-    # Create a dictionary of filters from the request arguments
-    # To be used in the query.filter() method below
     filters = {}
     for key, value in request.args.items():
         if key not in ["limit", "skip", "sort_by", "order"]:
             filters[key] = value
 
-    valid_filter_fields = ['name', 'house', 'role', 'age', 'strength']
+    valid_string_filter_fields = ['name', 'house', 'role', 'strength']
+    valid_integer_filter_fields = ['age']
 
-    query = CharacterModel.query  # To be able to filter, sort, and paginate the data
+    query = CharacterModel.query
 
-    # Apply filters
     for key, value in filters.items():
         if key == "age_more_than":
-            query = query.filter(CharacterModel.age >= int(value))
+            try:
+                query = query.filter(CharacterModel.age >= int(value))
+            except ValueError:
+                return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
         elif key == "age_less_than":
-            query = query.filter(CharacterModel.age <= int(value))
-        elif key in valid_filter_fields:
-            query = query.filter(func.lower(getattr(CharacterModel, key)) == value.lower())
+            try:
+                query = query.filter(CharacterModel.age <= int(value))
+            except ValueError:
+                return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
+        elif key in valid_string_filter_fields:
+            query = query.filter(getattr(CharacterModel, key).ilike(f"%{value}%"))
+        elif key in valid_integer_filter_fields:
+            try:
+                query = query.filter(getattr(CharacterModel, key) == int(value))
+            except ValueError:
+                return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
 
-    # Apply sorting
-    if sort_by and sort_by in valid_filter_fields:
+    valid_sort_fields = ['name', 'house', 'role', 'age', 'strength']
+    if sort_by and sort_by in valid_sort_fields:
         if order == "asc":
             query = query.order_by(getattr(CharacterModel, sort_by).asc())
         else:
             query = query.order_by(getattr(CharacterModel, sort_by).desc())
 
-    # Apply pagination
-    if skip is None:
-        skip = 0
-    if limit is None:
+    if limit is None and skip is None:
         limit = 20
         characters_query = query.all()
         random.shuffle(characters_query)
         characters_query = characters_query[:limit]
     else:
-        characters_query = query.offset(skip).limit(limit).all()
+        if skip is None:
+            skip = 0
+        if limit is None:
+            characters_query = query.offset(skip).all()
+        else:
+            characters_query = query.offset(skip).limit(limit).all()
 
-    # Convert the characters to a dictionary so we can jsonify them later
     characters_list = [character.to_dict() for character in characters_query]
 
     return jsonify(characters_list), 200

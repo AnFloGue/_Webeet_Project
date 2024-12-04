@@ -45,7 +45,6 @@ The provided URLs for testing your code look good. Here is a summary of the URLs
   - Example JSON body:
     ```json
     {
-      "id": 100,
       "name": "Test Character",
       "house": "Test House",
       "animal": "Test Animal",

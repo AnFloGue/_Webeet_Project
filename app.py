@@ -168,7 +168,126 @@ def get_characters():
     
         return jsonify(characters_list), 200
 
+# Get a character by ID
+@app.route("/characters/<int:id>", methods=["GET"])
+def get_character_by_id(id):
+    character = CharacterModel.query.get(id)
 
+    if not character:
+        return jsonify({"error": "Attention!!! - Character does not exist"}), 404
+
+    return jsonify(character.to_dict()), 200
+
+# Add a new character
+@app.route("/characters", methods=["POST"])
+def add_character():
+    data = request.json
+    required_fields = ["id", "name", "role", "age", "strength"]
+
+    # Check if all required fields are entered and valid
+    for field in required_fields:
+        if field not in data or not data[field]:
+            return jsonify({"error": f"Attention!!! - Missing required field: {field}"}), 400
+
+    # checking that data is the right type
+    if not isinstance(data["id"], int):
+        return jsonify({"error": "Attention!!! - 'id' must be an integer"}), 400
+    if not isinstance(data["age"], int):
+        return jsonify({"error": "Attention!!! - 'age' must be an integer"}), 400
+    if not isinstance(data["name"], str):
+        return jsonify({"error": "Attention!!! - 'name' must be a string"}), 400
+
+
+    # Check redundancie. if the character with the same id already exists
+    existing_character = CharacterModel.query.get(data["id"])
+    if existing_character:
+        return jsonify({"error": "Attention!!! - Character with this ID already exists"}), 400
+
+    # Create a new CharacterModel instance
+    new_character = CharacterModel(
+        id=data["id"],
+        name=data["name"],
+        house=data.get("house"),
+        animal=data.get("animal"),
+        symbol=data.get("symbol"),
+        nickname=data.get("nickname"),
+        role=data["role"],
+        age=data["age"],
+        death=data.get("death"),
+        strength=data["strength"]
+    )
+
+    db.session.add(new_character)
+    db.session.commit()
+
+    return jsonify({"message": "Character added"}), 201
+
+# Edit a character by ID
+@app.route("/characters/<int:id>", methods=["PATCH"])
+def edit_character(id):
+    # get the character by ID
+    character = CharacterModel.query.get(id)
+
+    # Check if the character exists
+    if not character:
+        return jsonify({"error": "Attention!!! - Character not found"}), 404
+
+    data = request.json
+    
+    fields = ['name', 'house', 'animal', 'symbol', 'nickname', 'role', 'age', 'death', 'strength']
+
+    # Update fields if present in the request
+    for field in fields:
+        if field in data:
+            if 'name' in data:
+                character.name = data['name']
+            if 'house' in data:
+                character.house = data['house']
+            if 'animal' in data:
+                character.animal = data['animal']
+            if 'symbol' in data:
+                character.symbol = data['symbol']
+            if 'nickname' in data:
+                character.nickname = data['nickname']
+            if 'role' in data:
+                character.role = data['role']
+            if 'age' in data:
+                character.age = data['age']
+            if 'death' in data:
+                character.death = data['death']
+            if 'strength' in data:
+                character.strength = data['strength']
+
+    db.session.commit()
+    return jsonify({"message": "Character updated"}), 200
+
+# Delete a character by ID
+@app.route("/characters/<int:id>", methods=["DELETE"])
+def delete_character(id):
+    
+    # get the character by ID
+    character = CharacterModel.query.get(id)
+
+    # Check if the character exists
+    if not character:
+        return jsonify({"error": "Attention!!! - Character not found"}), 404
+
+    db.session.delete(character)
+    db.session.commit()
+    return jsonify({"message": "Character deleted"}), 200
+
+# Error handlers
+@app.errorhandler(400)
+def bad_request(error):
+    return jsonify({"error": "Bad Request"}), 400
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"error": "Not Found"}), 404
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    return jsonify({"error": "Internal Server Error"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

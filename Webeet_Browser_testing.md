@@ -30,7 +30,7 @@ The provided URLs for testing your code look good. Here is a summary of the URLs
 - **Filter and sort characters by role, age, and name**:
   - `http://127.0.0.1:5000/characters?role=Knight&age_more_than=30&sort_by=name&order=asc`
 - **Complex query with multiple filters and sorting**:
-  - `/characters?limit=10&skip=0&sort_by=age&order=asc&name=Jon%20Snow&age_more_than=20`
+  - `http://127.0.0.1:5000/characters?limit=10&skip=0&sort_by=age&order=asc&name=Jon%20Snow&age_more_than=20`
   - `http://127.0.0.1:5000/characters?limit=5&skip=1&sort_by=age&order=asc&house=Stark`
 - **Retrieve a character by ID**:
   - `http://127.0.0.1:5000/characters/1`

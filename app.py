@@ -4,6 +4,7 @@ import json
 
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func
 
 app = Flask(__name__)
 
@@ -34,7 +35,7 @@ class CharacterModel(db.Model):
     age = db.Column(db.Integer, index=True)
     death = db.Column(db.Integer)
     strength = db.Column(db.String(100))
-    
+
     # Converting the CharacterModel object to a dictionary because jsonify() only accepts dictionaries and lists
     def to_dict(self):
         return {
@@ -97,18 +98,18 @@ def get_characters():
     skip = request.args.get("skip", type=int)
     sort_by = request.args.get("sort_by", type=str)
     order = request.args.get("order", "asc", type=str)
-    
+
     # Create a dictionary of filters from the request arguments
     # To be used in the query.filter() method below
     filters = {}
     for key, value in request.args.items():
         if key not in ["limit", "skip", "sort_by", "order"]:
             filters[key] = value
-    
+
     valid_filter_fields = ['name', 'house', 'role', 'age', 'strength']
-    
+
     query = CharacterModel.query  # To be able to filter, sort, and paginate the data
-    
+
     # Apply filters
     for key, value in filters.items():
         if key == "age_more_than":
@@ -116,28 +117,31 @@ def get_characters():
         elif key == "age_less_than":
             query = query.filter(CharacterModel.age <= int(value))
         elif key in valid_filter_fields:
-            query = query.filter(getattr(CharacterModel, key) == value)
+            query = query.filter(func.lower(getattr(CharacterModel, key)) == value.lower())
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
-    
+
     # Apply sorting
     if sort_by and sort_by in valid_filter_fields:
         if order == "asc":
             query = query.order_by(getattr(CharacterModel, sort_by).asc())
         else:
             query = query.order_by(getattr(CharacterModel, sort_by).desc())
-    
+
     # Apply pagination
     if skip is None:
         skip = 0
     if limit is None:
         limit = 20
-    
-    characters_query = query.offset(skip).limit(limit).all()
-    
+        characters_query = query.all()
+        random.shuffle(characters_query)
+        characters_query = characters_query[:limit]
+    else:
+        characters_query = query.offset(skip).limit(limit).all()
+
     # Convert the characters to a dictionary so we can jsonify them later
     characters_list = [character.to_dict() for character in characters_query]
-    
+
     return jsonify(characters_list), 200
 
 
@@ -145,10 +149,10 @@ def get_characters():
 @app.route("/characters/<int:id>", methods=["GET"])
 def get_character_by_id(id):
     character = CharacterModel.query.get(id)
-    
+
     if not character:
         return jsonify({"error": "Character not found"}), 404
-    
+
     return jsonify(character.to_dict()), 200
 
 
@@ -157,18 +161,18 @@ def get_character_by_id(id):
 def add_character():
     data = request.json
     required_fields = ["name", "role", "age", "strength"]
-    
+
     # Check if all required fields are entered and valid
     for field in required_fields:
         if field not in data or not data[field]:
             return jsonify({"error": f"Missing required field: {field}"}), 400
-    
+
     # Checking that data is the right type
     if not isinstance(data["age"], int):
         return jsonify({"error": "'age' must be an integer"}), 400
     if not isinstance(data["name"], str):
         return jsonify({"error": "'name' must be a string"}), 400
-    
+
     # Create a new CharacterModel instance with the data from the request
     new_character = CharacterModel(
         name=data["name"],
@@ -181,10 +185,10 @@ def add_character():
         death=data.get("death"),
         strength=data["strength"]
     )
-    
+
     db.session.add(new_character)
     db.session.commit()
-    
+
     return jsonify({"message": "Character added", "id": new_character.id}), 201
 
 
@@ -193,20 +197,20 @@ def add_character():
 def edit_character(id):
     # Get the character by ID
     character = CharacterModel.query.get(id)
-    
+
     # Check if the character exists
     if not character:
         return jsonify({"error": "Character not found"}), 404
-    
+
     data = request.json
-    
+
     fields = ['name', 'house', 'animal', 'symbol', 'nickname', 'role', 'age', 'death', 'strength']
-    
+
     # Update fields if present in the request
     for field in fields:
         if field in data:
             setattr(character, field, data[field])
-    
+
     db.session.commit()
     return jsonify({"message": "Character updated"}), 200
 
@@ -216,11 +220,11 @@ def edit_character(id):
 def delete_character(id):
     # Get the character by ID
     character = CharacterModel.query.get(id)
-    
+
     # Check if the character exists
     if not character:
         return jsonify({"error": "Character not found"}), 404
-    
+
     db.session.delete(character)
     db.session.commit()
     return jsonify({"message": "Character deleted"}), 200

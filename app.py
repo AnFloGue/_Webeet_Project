@@ -4,7 +4,6 @@ import json
 
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import asc, desc
 
 app = Flask(__name__)
 
@@ -59,15 +58,15 @@ def setup_database():
                 characters_data = json.load(file)
 
                 for character_data in characters_data:
-                    
+
                     # Convert age and death to integers if they exist, else set to None
                     age = int(character_data["age"]) if character_data.get("age") else None
                     death = int(character_data["death"]) if character_data.get("death") else None
-                    
+
                     # we go through the characters in the json file and grab the data
                     # instantiating an object of the CharacterModel class for each character
                     character_obj = CharacterModel(
-                        # mandatory will raise error
+                        # mandatory, will raise error if not existing
                         id=character_data["id"],
                         name=character_data["name"],
                         # if does not exist will be None
@@ -90,7 +89,7 @@ def setup_database():
 
 @app.route("/characters", methods=["GET"])
 def get_characters():
-    
+
     # getting the query parameters from the request
     # we will use to filter, sort and paginate the data
     # e.g.
@@ -100,15 +99,15 @@ def get_characters():
     skip = request.args.get("skip", type=int)
     sort_by = request.args.get("sort_by", type=str)
     order = request.args.get("order", "asc", type=str)
-    
+
     # create a dictionary of filters from the request arguments
     # to be used in the query.filter() method below
     filters = {}
     for key, value in request.args.items():
         if key not in ["limit", "skip", "sort_by", "order"]:
             filters[key] = value
-    
-    valid_filter_fields = ['id', 'name', 'house', 'animal', 'symbol', 'nickname', 'role', 'age', 'death', 'strength']
+
+    valid_filter_fields = ['name', 'house', 'role', 'age', 'strength']
 
     query = CharacterModel.query   # to be able to filter, sort and paginate the data
     
@@ -122,127 +121,54 @@ def get_characters():
             query = query.filter(getattr(CharacterModel, key) == value)
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
-    
+
+
     # Apply sorting
     if sort_by:
-        if sort_by == "age":
-            query = query.filter(CharacterModel.age != None)
         if order == "asc":
-            query = query.order_by(asc(getattr(CharacterModel, sort_by)))
+            if sort_by == "name":
+                query = query.order_by(CharacterModel.name.asc())
+            elif sort_by == "house":
+                query = query.order_by(CharacterModel.house.asc())
+            elif sort_by == "age":
+                query = query.order_by(CharacterModel.age.asc())
         else:
-            query = query.order_by(desc(getattr(CharacterModel, sort_by)))
-    
-    # Apply pagination
+            if sort_by == "name":
+                query = query.order_by(CharacterModel.name.desc())
+            elif sort_by == "house":
+                query = query.order_by(CharacterModel.house.desc())
+            elif sort_by == "age":
+                query = query.order_by(CharacterModel.age.desc())
+
+    # Apply pagination when limit and skip are given
     if limit is None and skip is None:
         characters = query.all()
         random_characters = random.sample(characters, min(20, len(characters)))
-        characters_list = [character.to_dict() for character in random_characters]
+        characters_list = []
+        
+        # Convert the characters to a dictionary so we can jsonify them later
+        for character in random_characters:
+            characters_list.append(character.to_dict())
+            
+            
+    # default pagination:
+    # if limit is not given, default to 20;
+    # if skip is not given, default to 0
     else:
         if skip is None:
             skip = 0
         if limit is None:
             limit = 20
         characters_query = query.offset(skip).limit(limit).all()
-        characters_list = [character.to_dict() for character in characters_query]
+        
+        characters_list = []
+        
+        for character in characters_query:
+            characters_list.append(character.to_dict())
     
-    return jsonify(characters_list), 200
+        return jsonify(characters_list), 200
 
-# Get a character by ID
-@app.route("/characters/<int:id>", methods=["GET"])
-def get_character_by_id(id):
-    character = CharacterModel.query.get(id)
 
-    if not character:
-        return jsonify({"error": "Attention!!! - Character does not exist"}), 404
-
-    return jsonify(character.to_dict()), 200
-
-# Add a new character
-@app.route("/characters", methods=["POST"])
-def add_character():
-    data = request.json
-    required_fields = ["id", "name", "role", "age", "strength"]
-
-    # Check if all required fields are inputted and valid
-    for field in required_fields:
-        if field not in data or not data[field]:
-            return jsonify({"error": f"Attention!!! - Missing required field: {field}"}), 400
-
-    # Validate data types
-    if not isinstance(data["id"], int):
-        return jsonify({"error": "Attention!!! - 'id' must be an integer"}), 400
-    if not isinstance(data["age"], int):
-        return jsonify({"error": "Attention!!! - 'age' must be an integer"}), 400
-    if not isinstance(data["name"], str):
-        return jsonify({"error": "Attention!!! - 'name' must be a string"}), 400
-    # Additional validation can be added here
-
-    # Check if the character with the same id already exists
-    existing_character = CharacterModel.query.get(data["id"])
-    if existing_character:
-        return jsonify({"error": "Attention!!! - Character with this ID already exists"}), 400
-
-    # Create a new CharacterModel instance
-    new_character = CharacterModel(
-        id=data["id"],
-        name=data["name"],
-        house=data.get("house"),
-        animal=data.get("animal"),
-        symbol=data.get("symbol"),
-        nickname=data.get("nickname"),
-        role=data["role"],
-        age=data["age"],
-        death=data.get("death"),
-        strength=data["strength"]
-    )
-
-    db.session.add(new_character)
-    db.session.commit()
-
-    return jsonify({"message": "Character added"}), 201
-
-# Edit a character by ID
-@app.route("/characters/<int:id>", methods=["PATCH"])
-def edit_character(id):
-    character = CharacterModel.query.get(id)
-
-    if not character:
-        return jsonify({"error": "Attention!!! - Character not found"}), 404
-
-    data = request.json
-
-    # Update fields if present in the request
-    for field in ['name', 'house', 'animal', 'symbol', 'nickname', 'role', 'age', 'death', 'strength']:
-        if field in data:
-            setattr(character, field, data[field])
-
-    db.session.commit()
-    return jsonify({"message": "Character updated"}), 200
-
-# Delete a character by ID
-@app.route("/characters/<int:id>", methods=["DELETE"])
-def delete_character(id):
-    character = CharacterModel.query.get(id)
-
-    if not character:
-        return jsonify({"error": "Attention!!! - Character not found"}), 404
-
-    db.session.delete(character)
-    db.session.commit()
-    return jsonify({"message": "Character deleted"}), 200
-
-# Error handlers
-@app.errorhandler(400)
-def bad_request(error):
-    return jsonify({"error": "Bad Request"}), 400
-
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({"error": "Not Found"}), 404
-
-@app.errorhandler(500)
-def internal_server_error(error):
-    return jsonify({"error": "Internal Server Error"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

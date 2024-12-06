@@ -1,54 +1,20 @@
-# test_webeet.py
-
 import unittest
 import json
-from app import app, db, CharacterModel
+from app import app
 
+class CharacterAPITestCase(unittest.TestCase):
+    """
+    Test case for the Character API.
+    """
 
-class TestWebeet(unittest.TestCase):
-    """
-    Unit tests for the Webeet application.
-    """
-    
-    @classmethod
-    def setUpClass(cls):
+    def setUp(self):
         """
-        Set up the test client and initialize the in-memory database.
-        This method is called once before all tests.
+        Set up the test client before each test.
         """
-        app.config['TESTING'] = True
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-        cls.client = app.test_client()
-        with app.app_context():
-            db.create_all()
-            cls.seed_test_database()
-    
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Tear down the in-memory database.
-        This method is called once after all tests.
-        """
-        with app.app_context():
-            db.session.remove()
-            db.drop_all()
-    
-    @staticmethod
-    def seed_test_database():
-        """
-        Seed the in-memory database with initial test data.
-        """
-        characters = [
-            CharacterModel(name='Jon Snow', house='Stark', role='King in the North', age=25, strength='Swordsmanship'),
-            CharacterModel(name='Daenerys Targaryen', house='Targaryen', role='Queen', age=24, strength='Dragons'),
-            CharacterModel(name='Arya Stark', house='Stark', role='Assassin', age=18, strength='Stealth'),
-            CharacterModel(name='Cersei Lannister', house='Lannister', role='Queen', age=42, strength='Politics'),
-            CharacterModel(name='Tyrion Lannister', house='Lannister', role='Hand of the Queen', age=39, strength='Intelligence'),
-        ]
-        db.session.bulk_save_objects(characters)
-        db.session.commit()
-    
-    def test_get_all_characters(self):
+        self.client = app.test_client()
+        self.client.testing = True
+
+    def test_get_characters(self):
         """
         Test the GET /characters endpoint.
         This test checks if the endpoint returns up to 20 random characters.
@@ -89,7 +55,9 @@ class TestWebeet(unittest.TestCase):
         self.assertIn('error', data)
     
     def test_filter_characters_case_insensitive(self):
-        """Test the GET /characters endpoint with case-insensitive filtering."""
+        """
+        Test the GET /characters endpoint with case-insensitive filtering.
+        """
         # Make two requests with different case but same content
         response_lower = self.client.get('/characters?name=tyrion&sort_by=id')
         response_mixed = self.client.get('/characters?name=TyRiOn&sort_by=id')
@@ -238,7 +206,6 @@ class TestWebeet(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         data = response.get_json()
         self.assertIn('error', data)
-
 
 if __name__ == '__main__':
     unittest.main()

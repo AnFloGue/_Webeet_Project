@@ -3,6 +3,7 @@ import os
 import json
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.sql.expression import func
 from dotenv import load_dotenv
 from urllib.parse import quote
 
@@ -30,7 +31,7 @@ class CharacterModel(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(100), nullable=False, index=True)
     house = db.Column(db.String(100), index=True)
-    animal = db.Column(db.String(50))
+    animal = db.Column(db.String(50))                                                                                                                                                               
     symbol = db.Column(db.String(50))
     nickname = db.Column(db.String(100))
     role = db.Column(db.String(100), index=True)
@@ -102,11 +103,10 @@ def home():
     """
     return jsonify({"message": "Welcome to the Character API"}), 200
 
+
+
 @app.route("/characters", methods=["GET"])
 def get_characters():
-    """
-    Get a list of characters with optional filtering, sorting, and pagination.
-    """
     limit = request.args.get("limit", type=int)
     skip = request.args.get("skip", type=int)
     sort_by = request.args.get("sort_by", type=str)
@@ -114,61 +114,55 @@ def get_characters():
 
     filters = {}
     for key, value in request.args.items():
-        # Skip the pagination and sorting parameters because we deal with them later
         if key not in ["limit", "skip", "sort_by", "order"]:
             filters[key] = value
 
-    # Check if the filter that are in the request are valid
     valid_filter_fields = ['age', 'name', 'house', 'role', 'strength']
     query = CharacterModel.query
 
     for key, value in filters.items():
-        # Apply the filter to the query
-        if key == "age_more_than":  # Filter characters with age greater than or equal to the value
+        if key == "age_more_than":
             try:
                 query = query.filter(CharacterModel.age >= int(value))
             except ValueError:
                 return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
-        elif key == "age_less_than": # Filter characters with age less than or equal to the value
+        elif key == "age_less_than":
             try:
                 query = query.filter(CharacterModel.age <= int(value))
             except ValueError:
                 return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
-        elif key in valid_filter_fields:  # Filter characters with the exact value
-            if key == "age":  # Filter characters with the exact age
+        elif key in valid_filter_fields:
+            if key == "age":
                 try:
                     query = query.filter(CharacterModel.age == int(value))
                 except ValueError:
                     return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
-            else:    # Filter characters with the value in the attribute
+            else:
                 query = query.filter(getattr(CharacterModel, key).ilike(f"%{value}%"))
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
 
     valid_sort_fields = ['name', 'house', 'role', 'age', 'strength', 'id']
-    if sort_by and sort_by in valid_sort_fields:  # Check if the sort_by field is valid
-        if order == "asc":   # Sort in ascending order
+    if sort_by and sort_by in valid_sort_fields:
+        if order == "asc":
             query = query.order_by(getattr(CharacterModel, sort_by).asc())
-        else:  # Sort in descending order
+        else:
             query = query.order_by(getattr(CharacterModel, sort_by).desc())
-    else:  #    Sort by ID in ascending order by default
+    else:
         query = query.order_by(CharacterModel.id.asc())
 
-    if limit is None and skip is None:    # Return the first 20 characters if no pagination parameters are provided
-        limit = 20
-        characters_query = query.limit(limit).all()
-    else:   # Apply pagination if the parameters are provided
-        if skip is None:     #  Set skip to 0 if it is not provided
+    if limit is None and skip is None:
+        # Return 20 random characters if no pagination parameters are provided
+        characters_query = query.order_by(func.random()).limit(20).all()
+    else:
+        if skip is None:
             skip = 0
-        if limit is None:   # Return all characters after the skip if limit is not provided
+        if limit is None:
             characters_query = query.offset(skip).all()
-        else:    # Apply both skip and limit
+        else:
             characters_query = query.offset(skip).limit(limit).all()
 
-    # Convert the characters to a list of dictionaries
-    characters_list = []
-    for character in characters_query:
-        characters_list.append(character.to_dict())
+    characters_list = [character.to_dict() for character in characters_query]
 
     return jsonify(characters_list), 200
 

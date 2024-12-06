@@ -4,11 +4,12 @@ import unittest
 import json
 from app import app, db, CharacterModel
 
+
 class TestWebeet(unittest.TestCase):
     """
     Unit tests for the Webeet application.
     """
-
+    
     @classmethod
     def setUpClass(cls):
         """
@@ -21,7 +22,7 @@ class TestWebeet(unittest.TestCase):
         with app.app_context():
             db.create_all()
             cls.seed_test_database()
-
+    
     @classmethod
     def tearDownClass(cls):
         """
@@ -31,7 +32,7 @@ class TestWebeet(unittest.TestCase):
         with app.app_context():
             db.session.remove()
             db.drop_all()
-
+    
     @staticmethod
     def seed_test_database():
         """
@@ -46,7 +47,7 @@ class TestWebeet(unittest.TestCase):
         ]
         db.session.bulk_save_objects(characters)
         db.session.commit()
-
+    
     def test_get_all_characters(self):
         """
         Test the GET /characters endpoint.
@@ -56,7 +57,7 @@ class TestWebeet(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertLessEqual(len(data), 20)
-
+    
     def test_pagination(self):
         """
         Test the GET /characters endpoint with pagination.
@@ -66,7 +67,7 @@ class TestWebeet(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(len(data), 2)
-
+    
     def test_get_character_by_id(self):
         """
         Test the GET /characters/<id> endpoint.
@@ -76,7 +77,7 @@ class TestWebeet(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data['name'], 'Jon Snow')
-
+    
     def test_get_character_by_invalid_id(self):
         """
         Test the GET /characters/<id> endpoint with an invalid ID.
@@ -86,20 +87,24 @@ class TestWebeet(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         data = response.get_json()
         self.assertIn('error', data)
-
+    
     def test_filter_characters_case_insensitive(self):
-        """
-        Test the GET /characters endpoint with case-insensitive filtering.
-        This test checks if the endpoint returns the same results for different cases of the filter value.
-        """
-        response = self.client.get('/characters?house=stark')
-        self.assertEqual(response.status_code, 200)
-        data_lower = response.get_json()
-        response = self.client.get('/characters?house=STArk')
-        self.assertEqual(response.status_code, 200)
-        data_mixed = response.get_json()
+        """Test the GET /characters endpoint with case-insensitive filtering."""
+        # Make two requests with different case but same content
+        response_lower = self.client.get('/characters?name=tyrion&sort_by=id')
+        response_mixed = self.client.get('/characters?name=TyRiOn&sort_by=id')
+        
+        # Check status codes
+        self.assertEqual(response_lower.status_code, 200)
+        self.assertEqual(response_mixed.status_code, 200)
+        
+        # Compare the data
+        data_lower = json.loads(response_lower.data)
+        data_mixed = json.loads(response_mixed.data)
+        
+        # The responses should be identical regardless of case
         self.assertEqual(data_lower, data_mixed)
-
+    
     def test_filter_characters_by_age_range(self):
         """
         Test the GET /characters endpoint with age range filtering.
@@ -110,7 +115,7 @@ class TestWebeet(unittest.TestCase):
         data = response.get_json()
         for character in data:
             self.assertTrue(20 <= character['age'] <= 30)
-
+    
     def test_filter_and_sort_combined(self):
         """
         Test the GET /characters endpoint with combined filtering and sorting.
@@ -123,7 +128,7 @@ class TestWebeet(unittest.TestCase):
         self.assertEqual(ages, sorted(ages))
         for character in data:
             self.assertEqual(character['house'].lower(), 'stark')
-
+    
     def test_add_new_character(self):
         """
         Test the POST /characters endpoint.
@@ -140,12 +145,12 @@ class TestWebeet(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         data = response.get_json()
         self.assertIn('id', data)
-
+        
         response = self.client.get(f'/characters/{data["id"]}')
         self.assertEqual(response.status_code, 200)
         character_data = response.get_json()
         self.assertEqual(character_data['name'], new_character['name'])
-
+    
     def test_add_character_missing_fields(self):
         """
         Test the POST /characters endpoint with missing fields.
@@ -159,7 +164,7 @@ class TestWebeet(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         data = response.get_json()
         self.assertIn('error', data)
-
+    
     def test_edit_character(self):
         """
         Test the PATCH /characters/<id> endpoint.
@@ -173,13 +178,13 @@ class TestWebeet(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data['message'], 'Character updated')
-
+        
         response = self.client.get('/characters/5')
         self.assertEqual(response.status_code, 200)
         character_data = response.get_json()
         self.assertEqual(character_data['nickname'], 'The Imp')
         self.assertEqual(character_data['strength'], 'Wit')
-
+    
     def test_edit_nonexistent_character(self):
         """
         Test the PATCH /characters/<id> endpoint with a non-existent character.
@@ -192,7 +197,7 @@ class TestWebeet(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         data = response.get_json()
         self.assertIn('error', data)
-
+    
     def test_delete_character(self):
         """
         Test the DELETE /characters/<id> endpoint.
@@ -202,10 +207,10 @@ class TestWebeet(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data['message'], 'Character deleted')
-
+        
         response = self.client.get('/characters/3')
         self.assertEqual(response.status_code, 404)
-
+    
     def test_delete_nonexistent_character(self):
         """
         Test the DELETE /characters/<id> endpoint with a non-existent character.
@@ -215,7 +220,7 @@ class TestWebeet(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         data = response.get_json()
         self.assertIn('error', data)
-
+    
     def test_invalid_http_method(self):
         """
         Test an invalid HTTP method on the /characters/<id> endpoint.
@@ -223,7 +228,7 @@ class TestWebeet(unittest.TestCase):
         """
         response = self.client.put('/characters/1', json={})
         self.assertEqual(response.status_code, 405)
-
+    
     def test_invalid_filter_attribute(self):
         """
         Test the GET /characters endpoint with an invalid filter attribute.
@@ -233,6 +238,7 @@ class TestWebeet(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         data = response.get_json()
         self.assertIn('error', data)
+
 
 if __name__ == '__main__':
     unittest.main()

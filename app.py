@@ -151,19 +151,19 @@ def get_characters():
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
 
-    valid_sort_fields = ['name', 'house', 'role', 'age', 'strength']
+    valid_sort_fields = ['name', 'house', 'role', 'age', 'strength', 'id']
     if sort_by and sort_by in valid_sort_fields:
         if order == "asc":
             query = query.order_by(getattr(CharacterModel, sort_by).asc())
         else:
             query = query.order_by(getattr(CharacterModel, sort_by).desc())
+    else:
+        query = query.order_by(CharacterModel.id.asc())
 
-    # If limit is not provided, return 20 random characters
+    # If limit is not provided, return 20 characters sorted by ID
     if limit is None and skip is None:
         limit = 20
-        characters_query = query.all()
-        random.shuffle(characters_query)
-        characters_query = characters_query[:limit]
+        characters_query = query.limit(limit).all()
 
     # If limit is not provided but skip is, return all characters after the skip
     else:

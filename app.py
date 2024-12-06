@@ -40,6 +40,8 @@ class CharacterModel(db.Model):
     def to_dict(self):
         """
         Convert the character model to a dictionary.
+        This is necessary because the model is a class, and it cannot be directly used with jsonify.
+        By converting it to a dictionary, we can easily jsonify it later.
         """
         return {
             "id": self.id,
@@ -59,8 +61,7 @@ def setup_database():
     """
     Setup the database before handling any request.
     """
-    # Check if the database has already been initialized, we only need to do this once per run
-    # because  after we have created the tables we will set db_initialized to True at the end of this function
+    # Check if the database has already been initialized
     if not hasattr(app, 'db_initialized'):
         print("Creating all tables for the database...")
         db.create_all()
@@ -115,11 +116,10 @@ def get_characters():
         # Skip the pagination and sorting parameters because we deal with them later
         if key not in ["limit", "skip", "sort_by", "order"]:
             filters[key] = value
-            
+
     # Check if the filter that are in the request are valid
     valid_filter_fields = ['age', 'name', 'house', 'role', 'strength']
     query = CharacterModel.query
-
 
     for key, value in filters.items():
         # Apply the filter to the query
@@ -163,8 +163,12 @@ def get_characters():
             characters_query = query.offset(skip).all()
         else:    # Apply both skip and limit
             characters_query = query.offset(skip).limit(limit).all()
-     # Convert the characters to a list of dictionaries
-    characters_list = [character.to_dict() for character in characters_query]
+
+    # Convert the characters to a list of dictionaries
+    characters_list = []
+    for character in characters_query:
+        characters_list.append(character.to_dict())
+
     return jsonify(characters_list), 200
 
 @app.route("/characters/<int:id>", methods=["GET"])
@@ -176,6 +180,7 @@ def get_character_by_id(id):
     # Check if the character exists
     if not character:
         return jsonify({"error": "Character not found"}), 404
+    # Return the character as a dictionary
     return jsonify(character.to_dict()), 200
 
 @app.route("/characters", methods=["POST"])
@@ -183,6 +188,7 @@ def add_character():
     """
     Add a new character to the database.
     """
+    # Get the JSON data from the request with all the required fields and check if they are valid
     data = request.json
     required_fields = ["name", "role", "age", "strength"]
 
@@ -209,9 +215,11 @@ def add_character():
         death=data.get("death"),
         strength=data["strength"]
     )
-
+     # Add the new character to the database
     db.session.add(new_character)
+    
     db.session.commit()
+    # Return the ID of the new character
     return jsonify({"message": "Character added", "id": new_character.id}), 201
 
 @app.route("/characters/<int:id>", methods=["PATCH"])
@@ -223,10 +231,11 @@ def edit_character(id):
     # Check if the character exists
     if not character:
         return jsonify({"error": "Character not found"}), 404
-
+   
+   # Get the JSON data from the request with the fields to update
     data = request.json
     fields = ['name', 'house', 'animal', 'symbol', 'nickname', 'role', 'age', 'death', 'strength']
-
+   
     for field in fields:
         # Update the character's attribute if it is in the request data
         if field in data:
@@ -240,6 +249,7 @@ def delete_character(id):
     """
     Delete a character by its ID.
     """
+    
     character = CharacterModel.query.get(id)
     # Check if the character exists
     if not character:

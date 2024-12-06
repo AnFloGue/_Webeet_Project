@@ -96,11 +96,16 @@ class CharacterAPITestCase(unittest.TestCase):
         """
         response = self.client.get('/characters?house=stark&sort_by=age&order=asc')
         self.assertEqual(response.status_code, 200)
+        # The response should contain characters
         data = response.get_json()
+        # The characters should be sorted by age in ascending order
         ages = []
         for character in data:
             ages.append(character['age'])
+            # Each character should belong to House Stark
         self.assertEqual(ages, sorted(ages))
+        
+        # The characters should all belong to House Stark
         for character in data:
             # Each character should belong to House Stark
             self.assertEqual(character['house'].lower(), 'stark')

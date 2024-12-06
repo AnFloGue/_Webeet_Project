@@ -166,18 +166,8 @@ class CharacterAPITestCase(unittest.TestCase):
         data = response.get_json()
         self.assertIn('error', data)
     
-    def test_delete_character(self):
-        """
-        Test the DELETE /characters/<id> endpoint.
-        This test checks if an existing character can be deleted.
-        """
-        response = self.client.delete('/characters/3')
-        self.assertEqual(response.status_code, 200)
-        data = response.get_json()
-        self.assertEqual(data['message'], 'Character deleted')
-        
-        response = self.client.get('/characters/3')
-        self.assertEqual(response.status_code, 404)
+    
+    
     
     def test_delete_nonexistent_character(self):
         """
@@ -206,6 +196,29 @@ class CharacterAPITestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         data = response.get_json()
         self.assertIn('error', data)
+        
+    def test_delete_last_character(self):
+        """
+        Test the DELETE /characters/<id> endpoint.
+        This test checks if the last character can be deleted.
+        """
+        # Retrieve the list of characters
+        response = self.client.get('/characters')
+        self.assertEqual(response.status_code, 200)
+        characters = response.get_json()
+        
+        # Get the last character's ID
+        last_character_id = characters[-1]['id']
+        
+        # Attempt to delete the last character
+        response = self.client.delete(f'/characters/{last_character_id}')
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data['message'], 'Character deleted')
+        
+        # Verify the character has been deleted
+        response = self.client.get(f'/characters/{last_character_id}')
+        self.assertEqual(response.status_code, 404)
 
 if __name__ == '__main__':
     unittest.main()

@@ -107,19 +107,23 @@ def home():
 
 @app.route("/characters", methods=["GET"])
 def get_characters():
+    # Get query parameters for pagination and sorting
     limit = request.args.get("limit", type=int)
     skip = request.args.get("skip", type=int)
     sort_by = request.args.get("sort_by", type=str)
     order = request.args.get("order", "asc", type=str)
 
+    # Initialize a dictionary to store filter parameters
     filters = {}
     for key, value in request.args.items():
         if key not in ["limit", "skip", "sort_by", "order"]:
             filters[key] = value
 
+    # Define valid fields for filtering
     valid_filter_fields = ['age', 'name', 'house', 'role', 'strength']
     query = CharacterModel.query
 
+    # Apply filters to the query
     for key, value in filters.items():
         if key == "age_more_than":
             try:
@@ -142,6 +146,7 @@ def get_characters():
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
 
+    # Define valid fields for sorting
     valid_sort_fields = ['name', 'house', 'role', 'age', 'strength', 'id']
     if sort_by and sort_by in valid_sort_fields:
         if order == "asc":
@@ -151,6 +156,7 @@ def get_characters():
     else:
         query = query.order_by(CharacterModel.id.asc())
 
+    # Apply pagination to the query
     if limit is None and skip is None:
         # Return 20 random characters if no pagination parameters are provided
         characters_query = query.order_by(func.random()).limit(20).all()
@@ -162,8 +168,10 @@ def get_characters():
         else:
             characters_query = query.offset(skip).limit(limit).all()
 
+    # Convert the query results to a list of dictionaries
     characters_list = [character.to_dict() for character in characters_query]
 
+    # Return the list of characters as a JSON response
     return jsonify(characters_list), 200
 
 @app.route("/characters/<int:id>", methods=["GET"])

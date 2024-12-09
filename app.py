@@ -58,24 +58,40 @@ class CharacterModel(db.Model):
             "strength": self.strength
         }
 
+# we could do this from another file and import it here
 @app.before_request
 def setup_database():
     """
-    Setup the database before handling any request.
+    Setup the database before dealing with any request.
     """
-    # Check if the database has already been initialized
+    # Check if the database has already been initialized if not it will create all tables
     if not hasattr(app, 'db_initialized'):
-        print("Creating all tables for the database...")
+        print("Database does not exist. Creating all tables for the database...")
+        
         db.create_all()
-        # Check if there are no characters in the database
+        
+        # Check if there are no characters in the database by checking if the first entry is empty
+        # so we dont reinitialize the database again and overwrite the existing data
         if not CharacterModel.query.first():
             try:
                 # Load characters from 'characters.json' file
                 with open("characters.json", "r") as file:
                     characters_data = json.load(file)
+                    
                     for character_data in characters_data:
-                        age = int(character_data["age"]) if character_data.get("age") else None
-                        death = int(character_data["death"]) if character_data.get("death") else None
+                        # Ensure 'age' is an integer and not empty
+                        if character_data.get("age"):
+                            age = int(character_data["age"])
+                        else:
+                            age = None
+                    
+                        # Ensure 'death' is an integer and not empty
+                        if character_data.get("death"):
+                            death = int(character_data["death"])
+                        else:
+                            death = None
+                    
+                        # Create a new CharacterModel object with the character data
                         character_obj = CharacterModel(
                             name=character_data["name"],
                             house=character_data.get("house"),
@@ -87,6 +103,8 @@ def setup_database():
                             death=death,
                             strength=character_data["strength"]
                         )
+                        # Add the character to the database session
+                        db.session.add(character_obj)
                         # Add the character to the database
                         db.session.add(character_obj)
                     # Commit the changes
@@ -103,27 +121,52 @@ def home():
     """
     return jsonify({"message": "Welcome to the Character API"}), 200
 
-
-
 @app.route("/characters", methods=["GET"])
 def get_characters():
-    # Get query parameters for pagination and sorting
+    """
+    Retrieve query parameters for pagination and sorting from the incoming HTTP request.
+    I try to execute the operation in one go but found a lot of problems so decide to separate in two actions, a
+    pagination and sorting of the character
+    """
+    # these are the pagination parameters from the request
     limit = request.args.get("limit", type=int)
     skip = request.args.get("skip", type=int)
     sort_by = request.args.get("sort_by", type=str)
     order = request.args.get("order", "asc", type=str)
-
-    # Initialize a dictionary to store filter parameters
+    
+    """
+    Initialize a dictionary to store filter parameters.
+    The query parameters come e.g. in the format: /characters?name=Jon&house=Stark
+    Example: [('name', 'John'), ('age_more_than', '25'), ('house', 'Stark')]
+    We convert this list of tuples to a dictionary.
+    and separate the filter parameters from the pagination and sorting parameters.
+    we will use the pagination values like "skip" and "limit" to paginate the query results
+    and the sorting values like sort_by and order to sort the query results.
+    """
+    # save the filter parameters (but not the sorting and pagination parameters)
+    # in the filters dictionary. e.g. {'name': 'Jon', 'house': 'Stark'}
     filters = {}
     for key, value in request.args.items():
         if key not in ["limit", "skip", "sort_by", "order"]:
             filters[key] = value
-
-    # Define valid fields for filtering
+    
+    """
+    valid_filter_fields will be the filtering values for the character  (like "name",
+    "age", "house") that we use to search over the character.
+    """
     valid_filter_fields = ['age', 'name', 'house', 'role', 'strength']
+    
+    ''' initializing an object (query) that gets all the data of characters from a database.
+    setting up a base  that can be refined (filter, sort, and paginate).'''
     query = CharacterModel.query
 
-    # Apply filters to the query
+    """
+    Apply filters to the initializing query.
+    Iterate over each key-value pair in the filters dictionary. Anything that was not
+    pagination or sorting parameters and was part of the request will be considered a filter.
+    e.g. /characters?age_more_than=25&house=Stark will be converted to {'age_more_than': '25', 'house': 'Stark'}
+    we look for strings in the filters dictionary that are not pagination or sorting parameters.
+    """
     for key, value in filters.items():
         if key == "age_more_than":
             try:
@@ -146,9 +189,13 @@ def get_characters():
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
 
-    # Define valid fields for sorting
-    valid_sort_fields = ['name', 'house', 'role', 'age', 'strength', 'id']
-    if sort_by and sort_by in valid_sort_fields:
+    """
+    Apply filters to the initializing query.
+    Iterate over each key-value pair in the filters dictionary.
+    """
+    valid_sort_fields = ['id', 'name', 'house', 'role', 'age', 'strength']
+    
+    if sort_by in valid_sort_fields:
         if order == "asc":
             query = query.order_by(getattr(CharacterModel, sort_by).asc())
         else:
@@ -156,9 +203,13 @@ def get_characters():
     else:
         query = query.order_by(CharacterModel.id.asc())
 
-    # Apply pagination to the query
+    """
+    Apply pagination to the initializing query
+    If no pagination parameters are provided, return 20 random characters.
+    Otherwise, use the provided limit and skip values to paginate the query results.
+    """
     if limit is None and skip is None:
-        # Return 20 random characters if no pagination parameters are provided
+        # By default we return 20 random characters if no pagination parameters are provided
         characters_query = query.order_by(func.random()).limit(20).all()
     else:
         if skip is None:
@@ -168,9 +219,14 @@ def get_characters():
         else:
             characters_query = query.offset(skip).limit(limit).all()
 
-    # Convert the query results to a list of dictionaries
-    characters_list = [character.to_dict() for character in characters_query]
-
+    """
+    after we have the query results, we convert the query results to a list of dictionaries
+    using the def to_dict(self): that we created above.
+    """
+    characters_list = []
+    for character in characters_query:
+        characters_list.append(character.to_dict())
+        
     # Return the list of characters as a JSON response
     return jsonify(characters_list), 200
 

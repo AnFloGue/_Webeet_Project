@@ -122,73 +122,71 @@ def home():
 @app.route("/characters", methods=["GET"])
 def get_characters():
     """
-    Retrieve query parameters for pagination and sorting from the incoming HTTP request.
+    Retrieve query parameters for pagination, sorting, and filtering from the incoming HTTP request.
+    Apply the filters, sorting, and pagination to the query and return the results as a JSON response.
     """
     # Retrieve pagination and sorting parameters from the request
     limit = request.args.get("limit", type=int)
     skip = request.args.get("skip", type=int)
     sort_by = request.args.get("sort_by", type=str)
     order = request.args.get("order", "asc", type=str)
-    
-    """
-    Initialize a dictionary to store filter parameters.
-    The query parameters come as e.g. in the format: /characters?name=Jon&house=Stark
-    We convert the query parameters to a dictionary and separate the filter parameters
-    from the pagination and sorting parameters.
-    We use the pagination values from the request like "skip" and "limit" to paginate the query results
-    and the sorting values like "sort_by" and "order" to sort the query results.
-    """
-    # save the filter parameters (but not the sorting and pagination parameters)
-    # in the filters dictionary. e.g. {'name': 'Jon', 'house': 'Stark'}
+
+    # Initialize a dictionary to store filter parameters
     filters = {}
     for key, value in request.args.items():
         if key not in ["limit", "skip", "sort_by", "order"]:
             filters[key] = value
-    
-    ''' "valid_filter_fields" is a list with filtering values for the character entities (like "name",
-     "age", "house") that we will use to search over the character.'''
 
-    valid_filter_fields = ['age', 'name', 'house', 'role', 'strength']
-    
-    ''' initializes a query object that retrieves all the data of characters from the database.
-    setting up a base that can be refined (filter, sort, and paginate).'''
+    # Initialize the query object
     query = CharacterModel.query
 
-    """
-    Apply filters to the initializing query.
-    Iterate over each key-value pair in the filters dictionary. Anything that was not
-    pagination or sorting parameters and was part of the request will be considered a filter.
-    e.g. /characters?age_more_than=25&house=Stark will be converted to {'age_more_than': '25', 'house': 'Stark'}
-    we look for strings in the filters dictionary that are not pagination or sorting parameters.
-    """
+# ==========================================================
+# Apply filters to the query
+# ==========================================================
     for key, value in filters.items():
+        # Check if the filter is for "age more than" a certain value
         if key == "age_more_than":
             try:
                 query = query.filter(CharacterModel.age >= int(value))
             except ValueError:
                 return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
+        # Check if the filter is for "age less than" a certain value
         elif key == "age_less_than":
             try:
                 query = query.filter(CharacterModel.age <= int(value))
             except ValueError:
                 return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
-        elif key in valid_filter_fields:
-            if key == "age":
-                try:
-                    query = query.filter(CharacterModel.age == int(value))
-                except ValueError:
-                    return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
-            else:
-                query = query.filter(getattr(CharacterModel, key).ilike(f"%{value}%"))
+        # Check if the filter is for "age" with an exact value
+        elif key == "age":
+            try:
+                query = query.filter(CharacterModel.age == int(value))
+            except ValueError:
+                return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
+        # Check if the filter is for "name"
+        elif key == "name":
+            query = query.filter(CharacterModel.name.ilike(f"%{value}%"))
+        # Check if the filter is for "house"
+        elif key == "house":
+            query = query.filter(CharacterModel.house.ilike(f"%{value}%"))
+        # Check if the filter is for "role"
+        elif key == "role":
+            query = query.filter(CharacterModel.role.ilike(f"%{value}%"))
+        # Check if the filter is for "strength"
+        elif key == "strength":
+            query = query.filter(CharacterModel.strength.ilike(f"%{value}%"))
+        # Return an error if the filter attribute is not recognized
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
-
-    """
-    Apply filters to the initializing query.
-    Iterate over each key-value pair in the filters dictionary.
-    """
-    valid_sort_fields = ['id', 'name', 'house', 'role', 'age', 'strength']
     
+# ==========================================================
+# List of valid sort fields
+# ==========================================================
+    
+    valid_sort_fields = ['id', 'name', 'house', 'role', 'age', 'strength']
+
+    # Once we have the query object, we can apply sorting to it
+    # first check if the sort_by field is valid and what is the field to sort by, e.g. id, name, house, role, age, strength
+    # then check if the order is ascending or descending
     if sort_by in valid_sort_fields:
         if order == "asc":
             query = query.order_by(getattr(CharacterModel, sort_by).asc())
@@ -197,13 +195,9 @@ def get_characters():
     else:
         query = query.order_by(CharacterModel.id.asc())
 
-    """
-    Apply pagination to the initializing query
-    If no pagination parameters are provided, return 20 random characters.
-    Otherwise, use the provided limit and skip values to paginate the query results.
-    """
+    # And once we have the sorted query, we can apply pagination to it
+    # if limit is None and skip is None, we will return 20 random characters
     if limit is None and skip is None:
-        # By default we return 20 random characters if no pagination parameters are provided
         characters_query = query.order_by(func.random()).limit(20).all()
     else:
         if skip is None:
@@ -213,10 +207,7 @@ def get_characters():
         else:
             characters_query = query.offset(skip).limit(limit).all()
 
-    """
-    after we have the query results, we convert the query results to a list of dictionaries
-    using the def to_dict(self): that we created above.
-    """
+    # Convert the query results to a list of dictionaries because the query results are objects and not JSON serializable
     characters_list = []
     for character in characters_query:
         characters_list.append(character.to_dict())

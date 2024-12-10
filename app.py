@@ -1,4 +1,3 @@
-# app.py
 import os
 import json
 from flask import Flask, request, jsonify
@@ -10,9 +9,10 @@ from urllib.parse import quote
 # Load environment variables from .env file
 load_dotenv()
 
+# Initialize the Flask application
 app = Flask(__name__)
 
-# Configure the PostgreSQL database using environment variables
+# Database configuration with PostgreSQL using environment variables   .env file
 DB_USER = os.getenv('POSTGRES_USER', 'postgres')
 DB_PASSWORD = quote(os.getenv('POSTGRES_PASSWORD', ''))
 DB_HOST = os.getenv('DB_HOST', 'localhost')
@@ -20,13 +20,15 @@ DB_PORT = os.getenv('DB_PORT', '5432')
 DB_NAME = os.getenv('DB_NAME', 'character_database')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Disable modification tracking for better performance
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Disable tracking for better performance
 
+# Initialize the SQLAlchemy object
 db = SQLAlchemy(app)
 
-
 class CharacterModel(db.Model):
-    # Define the schema for the "characters" table
+    """
+    CharacterModel represents a character in the database.
+    """
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(100), nullable=False, index=True)
     house = db.Column(db.String(100), index=True)
@@ -37,9 +39,13 @@ class CharacterModel(db.Model):
     age = db.Column(db.Integer, index=True)
     death = db.Column(db.Integer)
     strength = db.Column(db.String(100))
-    
+
     def to_dict(self):
-        # Convert the CharacterModel object to a dictionary for JSON responses
+        """
+        Convert the character model to a dictionary.
+        This is necessary because the model is a class, and it cannot be directly used with jsonify.
+        By converting it to a dictionary, we can easily jsonify it later.
+        """
         return {
             "id": self.id,
             "name": self.name,
@@ -53,23 +59,39 @@ class CharacterModel(db.Model):
             "strength": self.strength
         }
 
-
 @app.before_request
 def setup_database():
-    # Initialize the database and populate it with data if it's empty
+    """
+    Setup the database before dealing with any request.
+    """
+    # Check if the database has already been initialized if not it will create all tables
     if not hasattr(app, 'db_initialized'):
-        print("Setting up the database...")
+        print("Database does not exist. Creating all tables for the database...")
+        
         db.create_all()
         
-        # Check if the database is empty and populate it from 'characters.json' if necessary
+        # Check if there are no characters in the database by checking if the first entry is empty
+        # so we dont reinitialize the database again and overwrite the existing data
         if not CharacterModel.query.first():
             try:
+                # Load characters from 'characters.json' file
                 with open("characters.json", "r") as file:
                     characters_data = json.load(file)
                     
                     for character_data in characters_data:
-                        age = int(character_data["age"]) if character_data.get("age") else None
-                        death = int(character_data["death"]) if character_data.get("death") else None
+                        # Ensure 'age' is an integer and not empty
+                        if character_data.get("age"):
+                            age = int(character_data["age"])
+                        else:
+                            age = None
+                    
+                        # Ensure 'death' is an integer and not empty
+                        if character_data.get("death"):
+                            death = int(character_data["death"])
+                        else:
+                            death = None
+                    
+                        # Create a new CharacterModel object with each character's data
                         character_obj = CharacterModel(
                             name=character_data["name"],
                             house=character_data.get("house"),
@@ -81,42 +103,64 @@ def setup_database():
                             death=death,
                             strength=character_data["strength"]
                         )
+                        # Add the character to the database session
                         db.session.add(character_obj)
+                    # Commit the changes
                     db.session.commit()
             except FileNotFoundError:
-                print("Warning: 'characters.json' not found.")
+                print("Warning: 'characters.json' does not exist")
+        # Set the flag to True to avoid reinitializing the database
         app.db_initialized = True
-
 
 @app.route("/", methods=["GET"])
 def home():
-    # Return a welcome message at the root endpoint
+    """
+    Home route that returns a welcome message.
+    """
     return jsonify({"message": "Welcome to the Character API"}), 200
-
 
 @app.route("/characters", methods=["GET"])
 def get_characters():
-    # Retrieve characters with optional filters, sorting, and pagination
-    limit = request.args.get("limit", 20, type=int)
-    skip = request.args.get("skip", 0, type=int)
+    """
+    Retrieve query parameters for pagination and sorting from the incoming HTTP request.
+    """
+    # Retrieve pagination and sorting parameters from the request
+    limit = request.args.get("limit", type=int)
+    skip = request.args.get("skip", type=int)
     sort_by = request.args.get("sort_by", type=str)
     order = request.args.get("order", "asc", type=str)
     
-    # Validate pagination parameters
-    if limit <= 0 or skip < 0:
-        return jsonify({"error": "Invalid pagination parameters"}), 400
-    
-    # Extract filter parameters from the query
+    """
+    Initialize a dictionary to store filter parameters.
+    The query parameters come as e.g. in the format: /characters?name=Jon&house=Stark
+    We convert the query parameters to a dictionary and separate the filter parameters
+    from the pagination and sorting parameters.
+    We use the pagination values from the request like "skip" and "limit" to paginate the query results
+    and the sorting values like "sort_by" and "order" to sort the query results.
+    """
+    # save the filter parameters (but not the sorting and pagination parameters)
+    # in the filters dictionary. e.g. {'name': 'Jon', 'house': 'Stark'}
     filters = {}
     for key, value in request.args.items():
         if key not in ["limit", "skip", "sort_by", "order"]:
             filters[key] = value
     
-    # Define valid filter fields
+    ''' "valid_filter_fields" is a list with filtering values for the character entities (like "name",
+     "age", "house") that we will use to search over the character.'''
+
     valid_filter_fields = ['age', 'name', 'house', 'role', 'strength']
-    query = CharacterModel.query
     
-    # Apply filters dynamically
+    ''' initializes a query object that retrieves all the data of characters from the database.
+    setting up a base that can be refined (filter, sort, and paginate).'''
+    query = CharacterModel.query
+
+    """
+    Apply filters to the initializing query.
+    Iterate over each key-value pair in the filters dictionary. Anything that was not
+    pagination or sorting parameters and was part of the request will be considered a filter.
+    e.g. /characters?age_more_than=25&house=Stark will be converted to {'age_more_than': '25', 'house': 'Stark'}
+    we look for strings in the filters dictionary that are not pagination or sorting parameters.
+    """
     for key, value in filters.items():
         if key == "age_more_than":
             try:
@@ -138,45 +182,81 @@ def get_characters():
                 query = query.filter(getattr(CharacterModel, key).ilike(f"%{value}%"))
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
-    
-    # Define valid sort fields and apply sorting dynamically
-    valid_sort_fields = ['id', 'name', 'house', 'role', 'age', 'strength']
-    sort_by = sort_by if sort_by in valid_sort_fields else 'id'
-    sort_order = getattr(getattr(CharacterModel, sort_by), order)()
-    query = query.order_by(sort_order)
-    
-    # Apply pagination
-    characters_query = query.offset(skip).limit(limit).all()
-    characters_list = [character.to_dict() for character in characters_query]
-    
-    return jsonify(characters_list), 200
 
+    """
+    Apply filters to the initializing query.
+    Iterate over each key-value pair in the filters dictionary.
+    """
+    valid_sort_fields = ['id', 'name', 'house', 'role', 'age', 'strength']
+    
+    if sort_by in valid_sort_fields:
+        if order == "asc":
+            query = query.order_by(getattr(CharacterModel, sort_by).asc())
+        else:
+            query = query.order_by(getattr(CharacterModel, sort_by).desc())
+    else:
+        query = query.order_by(CharacterModel.id.asc())
+
+    """
+    Apply pagination to the initializing query
+    If no pagination parameters are provided, return 20 random characters.
+    Otherwise, use the provided limit and skip values to paginate the query results.
+    """
+    if limit is None and skip is None:
+        # By default we return 20 random characters if no pagination parameters are provided
+        characters_query = query.order_by(func.random()).limit(20).all()
+    else:
+        if skip is None:
+            skip = 0
+        if limit is None:
+            characters_query = query.offset(skip).all()
+        else:
+            characters_query = query.offset(skip).limit(limit).all()
+
+    """
+    after we have the query results, we convert the query results to a list of dictionaries
+    using the def to_dict(self): that we created above.
+    """
+    characters_list = []
+    for character in characters_query:
+        characters_list.append(character.to_dict())
+        
+    # Return the list of characters as a JSON response
+    return jsonify(characters_list), 200
 
 @app.route("/characters/<int:id>", methods=["GET"])
 def get_character_by_id(id):
-    # Retrieve a character by its ID
-    single_character = CharacterModel.query.get(id)
-    if not single_character:
+    """
+    Get a character by its ID.
+    """
+    character = CharacterModel.query.get(id)
+    # Check if the character exists
+    if not character:
         return jsonify({"error": "Character not found"}), 404
-    return jsonify(single_character.to_dict()), 200
-
+    # Return the character as a dictionary
+    return jsonify(character.to_dict()), 200
 
 @app.route("/characters", methods=["POST"])
 def add_character():
-    # Add a new character to the database
+    """
+    Add a new character to the database.
+    """
+    # Get the JSON data from the request with all the required fields and check if they are valid
     data = request.json
     required_fields = ["name", "role", "age", "strength"]
-    
-    # Validate required fields
+
     for field in required_fields:
+        # Check if the required field is missing or empty
         if field not in data or not data[field]:
             return jsonify({"error": f"Missing required field: {field}"}), 400
-    
-    # Validate age field
+
+    # Check if 'age' is an integer
     if not isinstance(data["age"], int):
         return jsonify({"error": "'age' must be an integer"}), 400
-    
-    # Create a new character
+    # Check if 'name' is a string
+    if not isinstance(data["name"], str):
+        return jsonify({"error": "'name' must be a string"}), 400
+
     new_character = CharacterModel(
         name=data["name"],
         house=data.get("house"),
@@ -188,59 +268,73 @@ def add_character():
         death=data.get("death"),
         strength=data["strength"]
     )
+     # Add the new character to the database
     db.session.add(new_character)
+    
     db.session.commit()
+    # Return the ID of the new character
     return jsonify({"message": "Character added", "id": new_character.id}), 201
-
 
 @app.route("/characters/<int:id>", methods=["PATCH"])
 def edit_character(id):
-    # Update a character by its ID
+    """
+    Edit an existing character by its ID.
+    """
     character = CharacterModel.query.get(id)
+    # Check if the character exists
     if not character:
         return jsonify({"error": "Character not found"}), 404
-    
+   
+   # Get the JSON data from the request with the fields to update
     data = request.json
     fields = ['name', 'house', 'animal', 'symbol', 'nickname', 'role', 'age', 'death', 'strength']
-    
-    # Update character fields dynamically
+   
     for field in fields:
+        # Update the character's attribute if it is in the request data
         if field in data:
             setattr(character, field, data[field])
-    
+
     db.session.commit()
     return jsonify({"message": "Character updated"}), 200
 
-
 @app.route("/characters/<int:id>", methods=["DELETE"])
 def delete_character(id):
-    # Delete a character by its ID
+    """
+    Delete a character by its ID.
+    """
+    
     character = CharacterModel.query.get(id)
+    # Check if the character exists
     if not character:
         return jsonify({"error": "Character not found"}), 404
-    
+
     db.session.delete(character)
     db.session.commit()
     return jsonify({"message": "Character deleted"}), 200
 
-
 @app.errorhandler(400)
 def bad_request(error):
-    # Handle 400 errors (Bad Request)
+    """
+    Handle 400 Bad Request errors.
+    """
     return jsonify({"error": "Bad Request"}), 400
-
 
 @app.errorhandler(404)
 def not_found(error):
-    # Handle 404 errors (Not Found)
+    """
+    Handle 404 Not Found errors.
+    """
     return jsonify({"error": "Not Found"}), 404
-
 
 @app.errorhandler(500)
 def internal_server_error(error):
-    # Handle 500 errors (Internal Server Error)
-    return jsonify({"error": "Internal Server Error"}), 500 if not app.debug else jsonify({"error": str(error)}), 500
-
+    """
+    Handle 500 Internal Server Error errors.
+    """
+    if app.debug:
+        return jsonify({"error": str(error)}), 500
+    else:
+        return jsonify({"error": "Internal Server Error"}), 500
 
 if __name__ == "__main__":
     setup_database()

@@ -58,7 +58,7 @@ class CharacterModel(db.Model):
             "death": self.death,
             "strength": self.strength
         }
-
+    
 @app.before_request
 def setup_database():
     """

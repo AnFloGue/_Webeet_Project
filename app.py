@@ -224,7 +224,7 @@ def get_character_by_id(id):
     # Check if the character exists
     if not character:
         return jsonify({"error": "Character not found"}), 404
-    # Return the character as a dictionary
+    # Return the character as a dictionary  using the function we created in the model above
     return jsonify(character.to_dict()), 200
 
 @app.route("/characters", methods=["POST"])
@@ -301,7 +301,12 @@ def delete_character(id):
 
     db.session.delete(character)
     db.session.commit()
-    return jsonify({"message": "Character deleted"}), 200
+    return jsonify({"message": f"Character '{character.name}' deleted"}), 200
+
+
+# ==========================================================
+# Error Handling
+# ==========================================================
 
 @app.errorhandler(400)
 def bad_request(error):
@@ -309,6 +314,7 @@ def bad_request(error):
     Handle 400 Bad Request errors.
     """
     return jsonify({"error": "Bad Request"}), 400
+
 
 @app.errorhandler(404)
 def not_found(error):
@@ -326,6 +332,9 @@ def internal_server_error(error):
         return jsonify({"error": str(error)}), 500
     else:
         return jsonify({"error": "Internal Server Error"}), 500
+    
+    
+# ==========================================================
 
 if __name__ == "__main__":
     setup_database()

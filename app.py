@@ -110,6 +110,7 @@ def initialize_database():
                 db.session.commit()
         except FileNotFoundError:
             print("Warning: 'characters.json' does not exist")
+        
 
 # Call the initialize_database function once when the application starts
 with app.app_context():
@@ -129,6 +130,25 @@ def home():
     Home route that returns a welcome message.
     """
     return jsonify({"message": "Welcome to the Character API"}), 200
+
+@app.route("/print_characters", methods=["GET"])
+def print_characters():
+    """
+    Print the content of the characters table.
+    """
+    # Execute the query to retrieve all characters
+    all_characters = CharacterModel.query.all()
+
+    # Convert the query results to a list of dictionaries
+    characters_list = [character.to_dict() for character in all_characters]
+
+    # Print the list of characters to the console
+    for character in characters_list:
+        
+        print(character)
+
+    # Return the list of characters as a JSON response
+    return jsonify(characters_list), 200
 
 @app.route("/characters", methods=["GET"])
 def get_characters():

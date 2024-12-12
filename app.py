@@ -12,7 +12,7 @@ load_dotenv()
 # Initialize the Flask application
 app = Flask(__name__)
 
-# Database configuration with PostgreSQL using environment variables   .env file
+# Database configuration with PostgreSQL using environment variables from .env file
 DB_USER = os.getenv('POSTGRES_USER', 'postgres')
 DB_PASSWORD = quote(os.getenv('POSTGRES_PASSWORD', ''))
 DB_HOST = os.getenv('DB_HOST', 'localhost')
@@ -58,58 +58,69 @@ class CharacterModel(db.Model):
             "death": self.death,
             "strength": self.strength
         }
-    
+
+def initialize_database():
+    """
+    Initialize the database if it does not exist.
+    """
+    print("Database does not exist. Creating all tables for the database...")
+    db.create_all()
+
+    # Check if there are no characters in the database
+    if not CharacterModel.query.first():
+        try:
+            # Load characters from 'characters.json' file
+            with open("characters.json", "r") as file:
+                characters_data = json.load(file)
+
+                for character_data in characters_data:
+                    # Ensure 'age' is an integer and not empty
+                    if character_data.get("age"):
+                        age = int(character_data["age"])
+                    else:
+                        age = None
+
+                    # Ensure 'death' is an integer and not empty
+                    if character_data.get("death"):
+                        death = int(character_data["death"])
+                    else:
+                        death = None
+                    
+                    # Ensure 'strength' is an integer and not empty
+                    if character_data.get("strength"):
+                        strength = int(character_data["strength"])
+                    else:
+                        strength = None
+                    
+                    # Create a new CharacterModel object with each character's data
+                    character_obj = CharacterModel(
+                        name=character_data["name"],
+                        house=character_data.get("house"),
+                        animal=character_data.get("animal"),
+                        symbol=character_data.get("symbol"),
+                        nickname=character_data.get("nickname"),
+                        role=character_data["role"],
+                        age=age,
+                        death=death,
+                        strength=strength
+                    )
+                    # Add the character to the database session
+                    db.session.add(character_obj)
+                # Commit the changes
+                db.session.commit()
+        except FileNotFoundError:
+            print("Warning: 'characters.json' does not exist")
+
+# Call the initialize_database function once when the application starts
+with app.app_context():
+    initialize_database()
+
 @app.before_request
 def setup_database():
     """
     Setup the database before dealing with any request.
     """
-    # Check if the database has already been initialized if not it will create all tables
     if not hasattr(app, 'db_initialized'):
-        print("Database does not exist. Creating all tables for the database...")
-        
-        db.create_all()
-        
-        # Check if there are no characters in the database by checking if the first entry is empty
-        # so we dont reinitialize the database again and overwrite the existing data
-        if not CharacterModel.query.first():
-            try:
-                # Load characters from 'characters.json' file
-                with open("characters.json", "r") as file:
-                    characters_data = json.load(file)
-                    
-                    for character_data in characters_data:
-                        # Ensure 'age' is an integer and not empty
-                        if character_data.get("age"):
-                            age = int(character_data["age"])
-                        else:
-                            age = None
-                    
-                        # Ensure 'death' is an integer and not empty
-                        if character_data.get("death"):
-                            death = int(character_data["death"])
-                        else:
-                            death = None
-                    
-                        # Create a new CharacterModel object with each character's data
-                        character_obj = CharacterModel(
-                            name=character_data["name"],
-                            house=character_data.get("house"),
-                            animal=character_data.get("animal"),
-                            symbol=character_data.get("symbol"),
-                            nickname=character_data.get("nickname"),
-                            role=character_data["role"],
-                            age=age,
-                            death=death,
-                            strength=character_data["strength"]
-                        )
-                        # Add the character to the database session
-                        db.session.add(character_obj)
-                    # Commit the changes
-                    db.session.commit()
-            except FileNotFoundError:
-                print("Warning: 'characters.json' does not exist")
-        # Set the flag to True to avoid reinitializing the database
         app.db_initialized = True
 
 @app.route("/", methods=["GET"])
@@ -137,12 +148,10 @@ def get_characters():
         if key not in ["limit", "skip", "sort_by", "order"]:
             filters[key] = value
 
-    # Initialize the query object
+    # Initialize the query object. a query for all records in the CharacterModel table
     query = CharacterModel.query
 
-# ==========================================================
-# Apply filters to the query
-# ==========================================================
+    # Apply filters to the query
     for key, value in filters.items():
         # Check if the filter is for "age more than" a certain value
         if key == "age_more_than":
@@ -177,16 +186,11 @@ def get_characters():
         # Return an error if the filter attribute is not recognized
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
-    
-# ==========================================================
-# List of valid sort fields
-# ==========================================================
-    
+
+    # List of valid sort fields
     valid_sort_fields = ['id', 'name', 'house', 'role', 'age', 'strength']
 
     # Once we have the query object, we can apply sorting to it
-    # first check if the sort_by field is valid and what is the field to sort by, e.g. id, name, house, role, age, strength
-    # then check if the order is ascending or descending
     if sort_by in valid_sort_fields:
         if order == "asc":
             query = query.order_by(getattr(CharacterModel, sort_by).asc())
@@ -196,7 +200,6 @@ def get_characters():
         query = query.order_by(CharacterModel.id.asc())
 
     # And once we have the sorted query, we can apply pagination to it
-    # if limit is None and skip is None, we will return 20 random characters
     if limit is None and skip is None:
         characters_query = query.order_by(func.random()).limit(20).all()
     else:
@@ -207,11 +210,11 @@ def get_characters():
         else:
             characters_query = query.offset(skip).limit(limit).all()
 
-    # Convert the query results to a list of dictionaries because the query results are objects and not JSON serializable
+    # Convert the query results to a list of dictionaries
     characters_list = []
     for character in characters_query:
         characters_list.append(character.to_dict())
-        
+
     # Return the list of characters as a JSON response
     return jsonify(characters_list), 200
 
@@ -224,7 +227,7 @@ def get_character_by_id(id):
     # Check if the character exists
     if not character:
         return jsonify({"error": "Character not found"}), 404
-    # Return the character as a dictionary  using the function we created in the model above
+    # Return the character as a dictionary
     return jsonify(character.to_dict()), 200
 
 @app.route("/characters", methods=["POST"])
@@ -232,7 +235,7 @@ def add_character():
     """
     Add a new character to the database.
     """
-    # Get the JSON data from the request with all the required fields and check if they are valid
+    # Get the JSON data from the request
     data = request.json
     required_fields = ["name", "role", "age", "strength"]
 
@@ -259,9 +262,8 @@ def add_character():
         death=data.get("death"),
         strength=data["strength"]
     )
-     # Add the new character to the database
+    # Add the new character to the database
     db.session.add(new_character)
-    
     db.session.commit()
     # Return the ID of the new character
     return jsonify({"message": "Character added", "id": new_character.id}), 201
@@ -275,11 +277,11 @@ def edit_character(id):
     # Check if the character exists
     if not character:
         return jsonify({"error": "Character not found"}), 404
-   
-   # Get the JSON data from the request with the fields to update
+
+    # Get the JSON data from the request
     data = request.json
     fields = ['name', 'house', 'animal', 'symbol', 'nickname', 'role', 'age', 'death', 'strength']
-   
+
     for field in fields:
         # Update the character's attribute if it is in the request data
         if field in data:
@@ -293,7 +295,6 @@ def delete_character(id):
     """
     Delete a character by its ID.
     """
-    
     character = CharacterModel.query.get(id)
     # Check if the character exists
     if not character:
@@ -303,18 +304,13 @@ def delete_character(id):
     db.session.commit()
     return jsonify({"message": f"Character '{character.name}' deleted"}), 200
 
-
-# ==========================================================
 # Error Handling
-# ==========================================================
-
 @app.errorhandler(400)
 def bad_request(error):
     """
     Handle 400 Bad Request errors.
     """
     return jsonify({"error": "Bad Request"}), 400
-
 
 @app.errorhandler(404)
 def not_found(error):
@@ -332,10 +328,6 @@ def internal_server_error(error):
         return jsonify({"error": str(error)}), 500
     else:
         return jsonify({"error": "Internal Server Error"}), 500
-    
-    
-# ==========================================================
 
 if __name__ == "__main__":
-    setup_database()
     app.run(debug=True)

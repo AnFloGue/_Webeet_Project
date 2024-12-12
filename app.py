@@ -59,6 +59,7 @@ class CharacterModel(db.Model):
             "strength": self.strength
         }
 
+
 def initialize_database():
     """
     Initialize the database if it does not exist.
@@ -86,12 +87,6 @@ def initialize_database():
                     else:
                         death = None
                     
-                    # Ensure 'strength' is an integer and not empty
-                    if character_data.get("strength"):
-                        strength = int(character_data["strength"])
-                    else:
-                        strength = None
-                    
                     # Create a new CharacterModel object with each character's data
                     character_obj = CharacterModel(
                         name=character_data["name"],
@@ -102,14 +97,14 @@ def initialize_database():
                         role=character_data["role"],
                         age=age,
                         death=death,
-                        strength=strength
+                        strength=character_data.get("strength"),
                     )
                     # Add the character to the database session
                     db.session.add(character_obj)
                 # Commit the changes
                 db.session.commit()
         except FileNotFoundError:
-            print("Warning: 'characters.json' does not exist")
+            print("Warning: 'characters.json' file does not exist")
         
 
 # Call the initialize_database function once when the application starts

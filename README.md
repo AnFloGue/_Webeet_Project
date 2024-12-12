@@ -191,6 +191,9 @@ Here's a comprehensive list of URLs for testing the API endpoints:
 - [Complex query 2](http://127.0.0.1:5000/characters?limit=5&skip=1&sort_by=age&order=asc&house=Stark)
 - [Filter by strength and house with pagination](http://127.0.0.1:5000/characters?strength=Intelligence&house=Stark&limit=5&skip=0)
 
+#### Print Characters in the Browser and in the Console
+- [Filter and sort by house and age](http://127.0.0.1:5000//print_characters)
+
 ### POST Request Examples
 
 To create a new character, send a POST request to `http://127.0.0.1:5000/characters` with the following JSON body:

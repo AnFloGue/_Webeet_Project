@@ -153,8 +153,32 @@ def print_characters():
 @app.route("/characters", methods=["GET"])
 def get_characters():
     """
-    Retrieve query parameters for pagination, sorting, and filtering from the incoming HTTP request.
-    Apply the filters, sorting, and pagination to the query and return the results as a JSON response.
+    Fetch and filter characters from the CharacterModel table.
+    
+    Filters are applied based on query parameters passed in the request.
+    Supported filters:
+        - Numeric filters:
+            * age_more_than: Filters for characters with age greater than or equal to the given value.
+            * age_less_than: Filters for characters with age less than or equal to the given value.
+            * age: Filters for characters with age equal to the given value.
+        - String filters:
+            * name: Filters for characters whose names contain the given value (case-insensitive).
+            * house: Filters for characters whose house contains the given value (case-insensitive).
+            * role: Filters for characters whose role contains the given value (case-insensitive).
+            * strength: Filters for characters whose strength contains the given value (case-insensitive).
+    
+    Additional features:
+        - Sorting:
+            * Supported fields: id, name, house, role, age, strength.
+            * Use the 'sort_by' parameter to specify the field and 'order' for ascending or descending order.
+            * Defaults to sorting by 'id' in ascending order if no valid sort_by is provided.
+        - Pagination:
+            * Use 'limit' to specify the maximum number of results to return.
+            * Use 'skip' to specify the number of results to skip.
+            * If no pagination is provided, defaults to a random selection of 20 characters.
+    
+    Returns:
+        - A JSON response with the filtered and paginated characters or an error message for invalid filters or values.
     """
     # Retrieve pagination and sorting parameters from the request
     limit = request.args.get("limit", type=int)
@@ -168,49 +192,36 @@ def get_characters():
         if key not in ["limit", "skip", "sort_by", "order"]:
             filters[key] = value
 
-    # Initialize the query object. a query for all records in the CharacterModel table
+    # Initialize the query object. A query for all records in the CharacterModel table
     query = CharacterModel.query
 
-    # Apply filters to the query
+    # Apply filters to the query by checking which filters are present in the request
     for key, value in filters.items():
-        # Check if the filter is for "age more than" a certain value
-        if key == "age_more_than":
+        # Handle numeric filters
+        if key in ["age_more_than", "age_less_than", "age"]:
             try:
-                query = query.filter(CharacterModel.age >= int(value))
+                value = int(value)
+                if key == "age_more_than":
+                    query = query.filter(CharacterModel.age >= value)
+                elif key == "age_less_than":
+                    query = query.filter(CharacterModel.age <= value)
+                elif key == "age":
+                    query = query.filter(CharacterModel.age == value)
             except ValueError:
                 return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
-        # Check if the filter is for "age less than" a certain value
-        elif key == "age_less_than":
-            try:
-                query = query.filter(CharacterModel.age <= int(value))
-            except ValueError:
-                return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
-        # Check if the filter is for "age" with an exact value
-        elif key == "age":
-            try:
-                query = query.filter(CharacterModel.age == int(value))
-            except ValueError:
-                return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
-        # Check if the filter is for "name"
-        elif key == "name":
-            query = query.filter(CharacterModel.name.ilike(f"%{value}%"))
-        # Check if the filter is for "house"
-        elif key == "house":
-            query = query.filter(CharacterModel.house.ilike(f"%{value}%"))
-        # Check if the filter is for "role"
-        elif key == "role":
-            query = query.filter(CharacterModel.role.ilike(f"%{value}%"))
-        # Check if the filter is for "strength"
-        elif key == "strength":
-            query = query.filter(CharacterModel.strength.ilike(f"%{value}%"))
-        # Return an error if the filter attribute is not recognized
+
+        # Handle string filters
+        elif key in ["name", "house", "role", "strength"]:
+            query = query.filter(getattr(CharacterModel, key).ilike(f"%{value}%"))
+
+        # Handle unsupported filters
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
 
     # List of valid sort fields
     valid_sort_fields = ['id', 'name', 'house', 'role', 'age', 'strength']
 
-    # Once we have the query object, we can apply sorting to it
+    # Apply sorting to the query
     if sort_by in valid_sort_fields:
         if order == "asc":
             query = query.order_by(getattr(CharacterModel, sort_by).asc())
@@ -219,7 +230,7 @@ def get_characters():
     else:
         query = query.order_by(CharacterModel.id.asc())
 
-    # And once we have the sorted query, we can apply pagination to it
+    # Apply pagination to the query
     if limit is None and skip is None:
         characters_query = query.order_by(func.random()).limit(20).all()
     else:
@@ -237,7 +248,6 @@ def get_characters():
 
     # Return the list of characters as a JSON response
     return jsonify(characters_list), 200
-
 @app.route("/characters/<int:id>", methods=["GET"])
 def get_character_by_id(id):
     """

@@ -1,3 +1,4 @@
+# test_webeet.py
 import unittest
 import json
 from app import app
@@ -36,14 +37,14 @@ class CharacterAPITestCase(unittest.TestCase):
         data = response.get_json()
         if len(data) < 3:
             self.skipTest("Not enough characters in the database to test pagination")
-    
+
         # Test pagination with limit=2 and skip=1
         response = self.client.get('/characters?limit=2&skip=1')
         self.assertEqual(response.status_code, 200)
         paginated_data = response.get_json()
         # The response should contain 2 characters
         self.assertEqual(len(paginated_data), 2)
-    
+
         # Verify that the characters returned are the correct ones
         expected_characters = data[1:3]  # Skip the first character and take the next two
         self.assertEqual(paginated_data, expected_characters)
@@ -139,7 +140,7 @@ class CharacterAPITestCase(unittest.TestCase):
         data = response.get_json()
         # The response should contain the ID of the new character
         self.assertIn('id', data)
-    
+
         response = self.client.get(f'/characters/{data["id"]}')
         # The new character should be retrievable by its ID
         self.assertEqual(response.status_code, 200)
@@ -249,6 +250,45 @@ class CharacterAPITestCase(unittest.TestCase):
         # Verify the character has been deleted
         response = self.client.get(f'/characters/{last_character_id}')
         self.assertEqual(response.status_code, 404)
+
+    def test_filter_characters_by_death_more_than(self):
+        """
+        Test the GET /characters endpoint with death_more_than filter.
+        This test checks if the endpoint returns characters with death year greater than the specified value.
+        """
+        response = self.client.get('/characters?death_more_than=7')
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        for character in data:
+            self.assertIn('death', character)
+            self.assertIsInstance(character['death'], int)
+            self.assertTrue(character['death'] > 7)
+
+    def test_filter_characters_by_death_less_than(self):
+        """
+        Test the GET /characters endpoint with death_less_than filter.
+        This test checks if the endpoint returns characters with death year less than the specified value.
+        """
+        response = self.client.get('/characters?death_less_than=9')
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        for character in data:
+            self.assertIn('death', character)
+            self.assertIsInstance(character['death'], int)
+            self.assertTrue(character['death'] < 9)
+
+    def test_filter_characters_by_death_range(self):
+        """
+        Test the GET /characters endpoint with death_more_than and death_less_than filters.
+        This test checks if the endpoint returns characters with death year within the specified range.
+        """
+        response = self.client.get('/characters?death_more_than=4&death_less_than=9')
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        for character in data:
+            self.assertIn('death', character)
+            self.assertIsInstance(character['death'], int)
+            self.assertTrue(4 < character['death'] < 9)
 
 if __name__ == '__main__':
     unittest.main()

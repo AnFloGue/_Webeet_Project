@@ -104,6 +104,9 @@ Query Parameters:
 - `age` (int): Filter by exact age
 - `age_more_than` (int): Filter by minimum age
 - `age_less_than` (int): Filter by maximum age
+- `death` (int): Filter by exact death year
+- `death_more_than` (int): Filter by minimum death year
+- `death_less_than` (int): Filter by maximum death year
 - `strength` (string): Filter by strength level
 
 #### Get Character by ID
@@ -175,9 +178,15 @@ Here's a comprehensive list of URLs for testing the API endpoints:
 - [Filter by name and house](http://127.0.0.1:5000/characters?name=Hodor&house=Stark)
 
 #### Age-Based Filtering
-- [Age greater than](http://127.0.0.1:5000/characters?age_more_than=25)
-- [Age less than](http://127.0.0.1:5000/characters?age_less_than=30)
+- [Age greater than...](http://127.0.0.1:5000/characters?age_more_than=25)
+- [Age less than...](http://127.0.0.1:5000/characters?age_less_than=30)
 - [Age range](http://127.0.0.1:5000/characters?age_more_than=20&age_less_than=22)
+
+#### Death-Based Filtering
+- [Death year greater than...](http://127.0.0.1:5000/characters?death_more_than=9)
+- [Death year less than...](http://127.0.0.1:5000/characters?death_less_than=7)
+- [Death year range](http://127.0.0.1:5000/characters?death_more_than=6&death_less_than=8)
+- [Death year equal to...](http://127.0.0.1:5000/characters?death=1)
 
 #### Sorting
 - [Sort by age (ascending)](http://127.0.0.1:5000/characters?sort_by=age&order=asc)

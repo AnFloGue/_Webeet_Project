@@ -1,3 +1,4 @@
+# app.py
 import os
 import json
 from flask import Flask, request, jsonify
@@ -129,7 +130,7 @@ def home():
 @app.route("/print_characters", methods=["GET"])
 def print_characters():
     """
-    Print the content of the characters table.
+    Print the content of the characters table for debuging purposes.
     """
     # Execute the query to retrieve all characters
     all_characters = CharacterModel.query.all()
@@ -152,10 +153,13 @@ def get_characters():
     
     Filters are applied based on query parameters passed in the request.
     Supported filters:
+    
         - Numeric filters:
             * age_more_than: Filters for characters with age greater than or equal to the given value.
             * age_less_than: Filters for characters with age less than or equal to the given value.
             * age: Filters for characters with age equal to the given value.
+            * death_more_than: Filters for characters with death greater than or equal to the given value.
+            
         - String filters:
             * name: Filters for characters whose names contain the given value (case-insensitive).
             * house: Filters for characters whose house contains the given value (case-insensitive).
@@ -163,10 +167,14 @@ def get_characters():
             * strength: Filters for characters whose strength contains the given value (case-insensitive).
     
     Additional features:
+    
+            once we have the filters, we can sort the results by a specific field and order.
+    
         - Sorting:
             * Supported fields: id, name, house, role, age, strength.
             * Use the 'sort_by' parameter to specify the field and 'order' for ascending or descending order.
             * Defaults to sorting by 'id' in ascending order if no valid sort_by is provided.
+            
         - Pagination:
             * Use 'limit' to specify the maximum number of results to return.
             * Use 'skip' to specify the number of results to skip.
@@ -193,7 +201,7 @@ def get_characters():
     # Apply filters to the query by checking which filters are present in the request
     for key, value in filters.items():
         # Handle numeric filters
-        if key in ["age_more_than", "age_less_than", "age"]:
+        if key in ["age_more_than", "age_less_than", "age", "death_more_than", "death_less_than", "death"]:
             try:
                 value = int(value)
                 if key == "age_more_than":
@@ -202,17 +210,28 @@ def get_characters():
                     query = query.filter(CharacterModel.age <= value)
                 elif key == "age":
                     query = query.filter(CharacterModel.age == value)
+                elif key == "death_more_than":
+                    query = query.filter(CharacterModel.death > value)
+                elif key == "death_less_than":
+                    query = query.filter(CharacterModel.death < value)
+                elif key == "death":
+                    query = query.filter(CharacterModel.death == value)
             except ValueError:
                 return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
-
+    
         # Handle string filters
-        elif key in ["name", "house", "role", "strength"]:
-            query = query.filter(getattr(CharacterModel, key).ilike(f"%{value}%"))
-
-        # Handle unsupported filters
+        elif key == "name":
+            query = query.filter(CharacterModel.name.ilike(f"%{value}%"))
+        elif key == "house":
+            query = query.filter(CharacterModel.house.ilike(f"%{value}%"))
+        elif key == "role":
+            query = query.filter(CharacterModel.role.ilike(f"%{value}%"))
+        elif key == "strength":
+            query = query.filter(CharacterModel.strength.ilike(f"%{value}%"))
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
-
+        
+# ========================================================
     # List of valid sort fields
     valid_sort_fields = ['id', 'name', 'house', 'role', 'age', 'strength']
 
@@ -243,6 +262,7 @@ def get_characters():
 
     # Return the list of characters as a JSON response
     return jsonify(characters_list), 200
+
 @app.route("/characters/<int:id>", methods=["GET"])
 def get_character_by_id(id):
     """

@@ -183,13 +183,29 @@ def get_characters():
     Returns:
         - A JSON response with the filtered and paginated characters or an error message for invalid filters or values.
     """
+    # ========================================================
+    # Filtering preparation
+    # ========================================================
+    
     # Retrieve pagination and sorting parameters from the request
-    limit = request.args.get("limit", type=int)
-    skip = request.args.get("skip", type=int)
+    limit = request.args.get("limit")
+    skip = request.args.get("skip")
     sort_by = request.args.get("sort_by", type=str)
     order = request.args.get("order", "asc", type=str)
+    
+    # Convert limit and skip to integers, handling invalid values
+    try:
+        limit = int(limit) if limit is not None else None
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid value for limit: must be an integer"}), 400
+    
+    try:
+        skip = int(skip) if skip is not None else None
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid value for skip: must be an integer"}), 400
 
-    # Initialize a dictionary to store filter parameters from the request
+    # Initialize a dictionary to store filter parameters from the request.
+    # we store filters that are not pagination or sorting parameters
     filters = {}
     for key, value in request.args.items():
         if key not in ["limit", "skip", "sort_by", "order"]:
@@ -198,8 +214,13 @@ def get_characters():
     # Initialize the query object. A query for all records in the CharacterModel table
     query = CharacterModel.query
 
+    # ========================================================
+    # Filtering execution
+    # ========================================================
+    
     # Apply filters to the query by checking which filters are present in the request
     # norrowing down the results by applying cumulatively the filters I use "and" operator (default in SQLAlchemy) and not "or" in the query
+    
     for key, value in filters.items():
         # Handle numeric filters (requires validation)
         if key in ["age_more_than", "age_less_than", "age", "death_more_than", "death_less_than", "death"]:
@@ -233,30 +254,47 @@ def get_characters():
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
         
-# ========================================================
+    # ========================================================
+    # Sorting
+    # ========================================================
     # List of valid sort fields
-    valid_sort_fields = ['id', 'name', 'house', 'role', 'age', 'strength']
+    valid_sort_fields = ['id', 'name', 'house', 'role', 'age', 'strength', 'animal', 'symbol', 'nickname', 'death']
 
     # Apply sorting to the query. Sorting happens only after all filters have been applied.
     if sort_by in valid_sort_fields:
         if order == "asc":
+            # gets the column name based on the value of sort_by and sorts the query in ascending order
             query = query.order_by(getattr(CharacterModel, sort_by).asc())
         else:
             query = query.order_by(getattr(CharacterModel, sort_by).desc())
     else:
+        # If the sort_by parameter is invalid, we sort by ID in ascending order by default
         query = query.order_by(CharacterModel.id.asc())
 
-    # Apply pagination to the query
+    # ========================================================
+    # Pagination
+    # ========================================================
+    
+    # 	If neither limit nor skip is provided, we take a random subset of 20 characters from the filtered results
     if limit is None and skip is None:
         characters_query = query.order_by(func.random()).limit(20).all()
+    
+    # If limit is provided but skip is not, we return the first 'limit' results from the filtered query but if limit
+    # is provided and skip is not, we return the first 'limit' results from the filtered query
     else:
+        # If skip is not provided, we set it to 0 to start from the beginning
         if skip is None:
             skip = 0
+        # If limit is not provided, we set it to None to return all results
         if limit is None:
             characters_query = query.offset(skip).all()
         else:
             characters_query = query.offset(skip).limit(limit).all()
 
+    # ========================================================
+    # Response
+    # ========================================================
+    
     # Convert the query results to a list of dictionaries
     characters_list = []
     for character in characters_query:
@@ -271,10 +309,10 @@ def get_character_by_id(id):
     Get a character by its ID.
     """
     character = CharacterModel.query.get(id)
-    # Check if the character exists
+
     if not character:
         return jsonify({"error": "Character not found"}), 404
-    # Return the character as a dictionary
+
     return jsonify(character.to_dict()), 200
 
 @app.route("/characters", methods=["POST"])

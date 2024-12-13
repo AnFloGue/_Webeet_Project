@@ -109,6 +109,26 @@ Query Parameters:
 - `death_less_than` (int): Filter by maximum death year
 - `strength` (string): Filter by strength level
 
+Filtering Parameters:
+- `age` (int): Filter by exact age
+- `age_more_than` (int): Filter by minimum age
+- `age_less_than` (int): Filter by maximum age
+- `death` (int): Filter by exact death year
+- `death_more_than` (int): Filter by minimum death year
+- `death_less_than` (int): Filter by maximum death year
+
+Sorting Parameters:
+- `id` (int): Sort by ID
+- `name` (string): Sort by name
+- `house` (string): Sort by house
+- `role` (string): Sort by role
+- `age` (int): Sort by age
+- `strength` (string): Sort by strength
+- `animal` (string): Sort by animal
+- `symbol` (string): Sort by symbol
+- `nickname` (string): Sort by nickname
+- `death` (int): Sort by death year
+
 #### Get Character by ID
 ```http
 GET /characters/{id}

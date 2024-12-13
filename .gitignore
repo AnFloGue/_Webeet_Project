@@ -9,4 +9,7 @@
 !app.py
 !database/
 !static/
-!templates/.idea/
+!templates/
+
+# Ignore .idea directory
+.idea/

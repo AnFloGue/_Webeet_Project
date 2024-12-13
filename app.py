@@ -189,7 +189,7 @@ def get_characters():
     sort_by = request.args.get("sort_by", type=str)
     order = request.args.get("order", "asc", type=str)
 
-    # Initialize a dictionary to store filter parameters
+    # Initialize a dictionary to store filter parameters from the request
     filters = {}
     for key, value in request.args.items():
         if key not in ["limit", "skip", "sort_by", "order"]:
@@ -199,8 +199,9 @@ def get_characters():
     query = CharacterModel.query
 
     # Apply filters to the query by checking which filters are present in the request
+    # norrowing down the results by applying cumulatively the filters I use "and" operator (default in SQLAlchemy) and not "or" in the query
     for key, value in filters.items():
-        # Handle numeric filters
+        # Handle numeric filters (requires validation)
         if key in ["age_more_than", "age_less_than", "age", "death_more_than", "death_less_than", "death"]:
             try:
                 value = int(value)
@@ -218,16 +219,17 @@ def get_characters():
                     query = query.filter(CharacterModel.death == value)
             except ValueError:
                 return jsonify({"error": f"Invalid value for {key}: must be an integer"}), 400
-    
+        
         # Handle string filters
-        elif key == "name":
-            query = query.filter(CharacterModel.name.ilike(f"%{value}%"))
-        elif key == "house":
-            query = query.filter(CharacterModel.house.ilike(f"%{value}%"))
-        elif key == "role":
-            query = query.filter(CharacterModel.role.ilike(f"%{value}%"))
-        elif key == "strength":
-            query = query.filter(CharacterModel.strength.ilike(f"%{value}%"))
+        elif key in ["name", "house", "role", "strength"]:
+            if key == "name":
+                query = query.filter(CharacterModel.name.ilike(f"%{value}%"))
+            elif key == "house":
+                query = query.filter(CharacterModel.house.ilike(f"%{value}%"))
+            elif key == "role":
+                query = query.filter(CharacterModel.role.ilike(f"%{value}%"))
+            elif key == "strength":
+                query = query.filter(CharacterModel.strength.ilike(f"%{value}%"))
         else:
             return jsonify({"error": f"Invalid filter attribute: {key}"}), 400
         
@@ -235,7 +237,7 @@ def get_characters():
     # List of valid sort fields
     valid_sort_fields = ['id', 'name', 'house', 'role', 'age', 'strength']
 
-    # Apply sorting to the query
+    # Apply sorting to the query. Sorting happens only after all filters have been applied.
     if sort_by in valid_sort_fields:
         if order == "asc":
             query = query.order_by(getattr(CharacterModel, sort_by).asc())

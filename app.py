@@ -363,14 +363,18 @@ def edit_character(id):
     if not character:
         return jsonify({"error": "Character not found"}), 404
 
-    # Get the JSON data from the request
-    data = request.json
-    fields = ['name', 'house', 'animal', 'symbol', 'nickname', 'role', 'age', 'death', 'strength']
+    # Get the JSON payload data from the request
+    request_payload = request.json
+    
+    editable_fields = ['name', 'house', 'animal', 'symbol', 'nickname', 'role', 'age', 'death', 'strength']
 
-    for field in fields:
-        # Update the character's attribute if it is in the request data
-        if field in data:
-            setattr(character, field, data[field])
+    # go through each element in the editable_fields list
+    for field in editable_fields:
+        # and check if the field is in the request_payload
+        if field in request_payload:
+            # if the field is in the request_payload, we set the value of the field in the
+            # character object to the value in the request_payload that we get from the request_payload dictionary
+            setattr(character, field, request_payload[field])
 
     db.session.commit()
     return jsonify({"message": "Character updated"}), 200

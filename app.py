@@ -320,38 +320,48 @@ def add_character():
     """
     Add a new character to the database.
     """
-    # Get the JSON data from the request
-    data = request.json
+    # Retrieve the JSON payload from the request and convert it to a dictionary
+    data_request = request.json
+    
+    # define the minimum fields that must be present in the request
+    # payload for the character to be added to the database
     required_fields = ["name", "role", "age", "strength"]
 
     for field in required_fields:
         # Check if the required field is missing or empty
-        if field not in data or not data[field]:
+        if field not in data_request or not data_request[field]:
             return jsonify({"error": f"Missing required field: {field}"}), 400
 
     # Check if 'age' is an integer
-    if not isinstance(data["age"], int):
+    if not isinstance(data_request["age"], int):
         return jsonify({"error": "'age' must be an integer"}), 400
     # Check if 'name' is a string
-    if not isinstance(data["name"], str):
+    if not isinstance(data_request["name"], str):
         return jsonify({"error": "'name' must be a string"}), 400
+    # Check if 'role' is a string
+    if not isinstance(data_request["role"], str):
+        return jsonify({"error": "'role' must be a string"}), 400
+    # Check if 'strength' is a string
+    if not isinstance(data_request["strength"], str):
+        return jsonify({"error": "'strength' must be a string"}), 400
 
+    # Create a new CharacterModel object with the data from the request
     new_character = CharacterModel(
-        name=data["name"],
-        house=data.get("house"),
-        animal=data.get("animal"),
-        symbol=data.get("symbol"),
-        nickname=data.get("nickname"),
-        role=data["role"],
-        age=data["age"],
-        death=data.get("death"),
-        strength=data["strength"]
+        name=data_request["name"],
+        house=data_request.get("house"),
+        animal=data_request.get("animal"),
+        symbol=data_request.get("symbol"),
+        nickname=data_request.get("nickname"),
+        role=data_request["role"],
+        age=data_request["age"],
+        death=data_request.get("death"),
+        strength=data_request["strength"]
     )
     # Add the new character to the database
     db.session.add(new_character)
     db.session.commit()
-    # Return the ID of the new character
-    return jsonify({"message": "Character added", "id": new_character.id}), 201
+    # Returned the new character's data as a JSON response with information about the added character
+    return jsonify({"message": "Character added", "name": new_character.name, "id": new_character.id}), 201
 
 @app.route("/characters/<int:id>", methods=["PATCH"])
 def edit_character(id):

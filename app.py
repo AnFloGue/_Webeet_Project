@@ -89,7 +89,7 @@ def initialize_database():
                     else:
                         death = None
                     
-                    # Create a new CharacterModel object with each character's data
+                    # Create a new CharacterModel object with each character's data using keyword arguments
                     character_obj = CharacterModel(
                         name=character_data["name"],
                         house=character_data.get("house"),

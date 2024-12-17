@@ -91,12 +91,12 @@ def initialize_database():
                     
                     # Create a new CharacterModel object with each character's data using keyword arguments
                     character_obj = CharacterModel(
-                        name=character_data["name"],
+                        name=character_data.get("name"),
                         house=character_data.get("house"),
                         animal=character_data.get("animal"),
                         symbol=character_data.get("symbol"),
                         nickname=character_data.get("nickname"),
-                        role=character_data["role"],
+                        role=character_data.get("role"),
                         age=age,
                         death=death,
                         strength=character_data.get("strength"),

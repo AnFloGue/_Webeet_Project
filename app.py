@@ -137,8 +137,10 @@ def print_characters():
     all_characters = CharacterModel.query.all()
 
     # Convert the query results to a list of dictionaries
-    characters_list = [character.to_dict() for character in all_characters]
-
+    characters_list = []
+    for character in all_characters:
+        characters_list.append(character.to_dict())
+        
     # Print the list of characters to the console
     for character in characters_list:
         

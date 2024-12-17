@@ -24,6 +24,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{DB_USER}:{DB_PASSWORD}@{
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Disable tracking for better performance
 
 # Initialize the SQLAlchemy object
+# bind the database to the app
 db = SQLAlchemy(app)
 
 class CharacterModel(db.Model):

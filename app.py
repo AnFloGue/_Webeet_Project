@@ -6,6 +6,9 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.sql.expression import func
 from dotenv import load_dotenv
 from urllib.parse import quote
+from flask_migrate import Migrate
+
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,6 +29,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Disable tracking for bet
 # Initialize the SQLAlchemy object
 # bind the database to the app
 db = SQLAlchemy(app)
+
+# Initialize the Migrate object, in process, not implemented yet
+MIgrate = Migrate(app, db)
 
 class CharacterModel(db.Model):
     """

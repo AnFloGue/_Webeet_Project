@@ -30,7 +30,13 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Disable tracking for bet
 # bind the database to the app
 db = SQLAlchemy(app)
 
-# Initialize the Migrate object, in process, not implemented yet
+# Initialize the Migrate object binding the app and the database
+# to run migrations from the terminal, use the following command:
+# flask db init
+# flask db migrate -m "Initial migration."
+# flask db upgrade
+
+# Not implemented yet
 MIgrate = Migrate(app, db)
 
 class CharacterModel(db.Model):

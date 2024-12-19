@@ -121,10 +121,6 @@ def initialize_database():
             print("Warning: 'characters.json' file does not exist")
         
 
-# Call the initialize_database function once when the application starts
-with app.app_context():
-    initialize_database()
-
 @app.before_request
 def setup_database():
     """
@@ -132,6 +128,10 @@ def setup_database():
     """
     if not hasattr(app, 'db_initialized'):
         app.db_initialized = True
+        # Call the initialize_database function if the database has not been initialized
+        # by checking if the app object has the 'db_initialized' attribute
+        
+        initialize_database()
 
 @app.route("/", methods=["GET"])
 def home():
@@ -444,4 +444,5 @@ def internal_server_error(error):
         return jsonify({"error": "Internal Server Error"}), 500
 
 if __name__ == "__main__":
+    
     app.run(debug=True)

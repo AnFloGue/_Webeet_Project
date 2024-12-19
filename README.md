@@ -49,7 +49,7 @@ A Flask-based REST API for managing character data with PostgreSQL backend.
 
 1. Clone the repository:
    ```bash
-   git clone [repository URL]
+   git clone https://github.com/AnFloGue/_Webeet_Project.git]
    ```
 
 2. Navigate to the project directory:
@@ -177,7 +177,7 @@ The API includes proper error handling for:
 
 Run the test suite:
 ```bash
-python -m unittest test_webeet.py
+  python -m unittest test_webeet.py
 ```
 
 ## Testing URLs
@@ -192,10 +192,10 @@ Here's a comprehensive list of URLs for testing the API endpoints:
 - [Get character by ID](http://127.0.0.1:5000/characters/1)
 
 #### Filtering
-- [Filter by name](http://127.0.0.1:5000/characters?name=Shae)
+- [Filter by name](http://127.0.0.1:5000/characters?name=Antonio%20Stark)
 - [Filter by house](http://127.0.0.1:5000/characters?house=Lannister)
-- [Filter by role](http://127.0.0.1:5000/characters?role=Handmaiden)
-- [Filter by name and house](http://127.0.0.1:5000/characters?name=Hodor&house=Stark)
+- [Filter by role](http://127.0.0.1:5000/characters?role=Knight)
+- [Filter by name and house](http://127.0.0.1:5000/characters?name=Jon%20Snow&house=Stark)
 
 #### Age-Based Filtering
 - [Age greater than...](http://127.0.0.1:5000/characters?age_more_than=25)

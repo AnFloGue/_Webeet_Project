@@ -140,26 +140,26 @@ def home():
     """
     return jsonify({"message": "Welcome to the Character API"}), 200
 
-@app.route("/print_characters", methods=["GET"])
-def print_characters():
-    """
-    Print the content of the characters table for debuging purposes.
-    """
-    # Execute the query to retrieve all characters
-    all_characters = CharacterModel.query.all()
-
-    # Convert the query results to a list of dictionaries
-    characters_list = []
-    for character in all_characters:
-        characters_list.append(character.to_dict())
-        
-    # Print the list of characters to the console
-    for character in characters_list:
-        
-        print(character)
-
-    # Return the list of characters as a JSON response
-    return jsonify(characters_list), 200
+# @app.route("/print_characters", methods=["GET"])
+# def print_characters():
+#     """
+#     Print the content of the characters table for debuging purposes.
+#     """
+#     # Execute the query to retrieve all characters
+#     all_characters = CharacterModel.query.all()
+#
+#     # Convert the query results to a list of dictionaries
+#     characters_list = []
+#     for character in all_characters:
+#         characters_list.append(character.to_dict())
+#
+#     # Print the list of characters to the console
+#     for character in characters_list:
+#
+#         print(character)
+#
+#     # Return the list of characters as a JSON response
+#     return jsonify(characters_list), 200
 
 @app.route("/characters", methods=["GET"])
 def get_characters():
